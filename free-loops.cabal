@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
+    Control.Loop
     Control.Monad.Loop
   -- other-modules:
   -- other-extensions:    
