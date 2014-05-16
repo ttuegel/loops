@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Control.Loop
-    ( Loop, Loop'
+    ( Loop
     , unfoldl, for
     , module Control.Monad.Trans.Class
     ) where
@@ -20,6 +20,7 @@ instance Functor LoopOp where
     fmap f op =
         case op of
           Unfold i0 unf -> Unfold i0 $ fmap (second f) . unf
+    {-# INLINE fmap #-}
 
 instance Foldable LoopOp where
     foldr f r0 op =
@@ -30,6 +31,7 @@ instance Foldable LoopOp where
                   Nothing -> r0
                   Just (i', a) -> f a $ go i'
           in go i0
+    {-# INLINE foldr #-}
 
     foldl' f r0 op =
       case op of
@@ -39,9 +41,9 @@ instance Foldable LoopOp where
                   Nothing -> r
                   Just (i', a) -> go i' $! f r a
           in go i0 r0
+    {-# INLINE foldl' #-}
 
 type Loop = F LoopOp
-type Loop' = Free LoopOp
 
 unfoldl :: MonadFree LoopOp m => (i -> Maybe (i, r)) -> i -> m r
 unfoldl unf i0 = liftF $ Unfold i0 unf
@@ -54,4 +56,7 @@ for i0 cont next = unfoldl unf i0
 
 instance (Foldable f, Functor f) => Foldable (F f) where
     foldr f r = foldr f r . (fromF :: Functor f => F f a -> Free f a)
+    {-# INLINE foldr #-}
+
     foldl' f r = foldl' f r . (fromF :: Functor f => F f a -> Free f a)
+    {-# INLINE foldl' #-}
