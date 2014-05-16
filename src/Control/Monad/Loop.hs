@@ -7,7 +7,8 @@ module Control.Monad.Loop
     ) where
 
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Free
+import Control.Monad.Trans.Free (liftF)
+import Control.Monad.Trans.Free.Church
 import Data.Bifunctor
 import Data.Strict.Maybe
 import Data.Strict.Tuple
@@ -23,7 +24,7 @@ instance Functor LoopOp where
         case op of
           Unfold i0 unf -> Unfold i0 $ fmap (second f) . unf
 
-type LoopT = FreeT LoopOp
+type LoopT = FT LoopOp
 
 loopT :: Monad m => LoopT m () -> m ()
 loopT = iterT go
