@@ -12,6 +12,7 @@ main = defaultMain
                 [ bench "list" $ nf bench_sum_foldl_list iters
                 , bench "vector" $ nf bench_sum_foldl_vector iters
                 , bench "loop" $ nf bench_sum_foldl_loop iters
+                , bench "loop'" $ nf bench_sum_foldl_loop' iters
                 ]
             , bgroup "foldr"
                 [ bench "list" $ nf bench_sum_foldr_list iters
