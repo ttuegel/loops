@@ -49,3 +49,20 @@ test-suite tests
     tasty-quickcheck >=0.8 && <1
   ghc-options: -Wall
   default-language: Haskell2010
+
+benchmark benchs
+  type: exitcode-stdio-1.0
+  hs-source-dirs:
+    bench
+  main-is:
+    Bench.hs
+  other-modules:
+    Bench.Loop.Sum
+  build-depends:
+    base >=4.7 && <5,
+    criterion >=0.8 && <1,
+    free-loops,
+    strict >=0.3 && <1,
+    vector >=0.10 && <1
+  ghc-options: -Wall
+  default-language: Haskell2010

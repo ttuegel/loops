@@ -11,8 +11,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Free.Church
 import Data.Bifunctor
 import Data.Foldable
-import Data.Strict.Maybe
-import Prelude hiding (Maybe(..))
 
 data LoopOp r = forall i. Unfold i (i -> Maybe (i, r))
 
