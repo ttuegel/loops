@@ -34,19 +34,14 @@ instance Foldable LoopPrim where
           in go i0
     {-# INLINE foldr #-}
 
-    foldl' = go where
-      go :: (r -> a -> r) -> r -> LoopPrim a -> r
-      go f r0 prim =
-        case prim of
-          Map prim' g -> go (\r -> f r . g) r0 prim'
-          For i0 check next ->
-            let _for i r
-                  | check i =
-                    let i' = next i
-                        r' = f r i
-                    in i' `seq` r `seq` _for i' r'
-                  | otherwise = r
-            in _for i0 r0
+    foldl' f r0 prim =
+      case prim of
+        Map prim' g -> foldl' (\r -> f r . g) r0 prim'
+        For i0 check next ->
+          let _for i r
+                | check i = _for (next i) $! f r i
+                | otherwise = r
+          in _for i0 r0
     {-# INLINE foldl' #-}
 
 type Loop = F LoopPrim
