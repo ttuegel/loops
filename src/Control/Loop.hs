@@ -7,13 +7,12 @@ module Control.Loop
     , module Control.Monad.Trans.Class
     ) where
 
-import Control.Category
 import Control.Monad.Trans.Class
 import Control.Monad.Free.Church
 import Control.Monad.Trans.Free.Church hiding (F, fromF, runF)
 import Data.Foldable
 import Data.Maybe (fromJust, isJust)
-import Prelude hiding ((.), foldr, id)
+import Prelude hiding (foldr)
 
 data LoopPrim a = forall b. For b (b -> Bool) (b -> b) (b -> a)
 
@@ -54,10 +53,3 @@ for i0 check next = liftF $ For i0 check next id
 unfoldl :: (Functor m, MonadFree LoopPrim m) => (i -> Maybe (i, r)) -> i -> m r
 unfoldl unf i0 = fmap (fromJust . fmap snd) $ for (unf i0) isJust (>>= unf . fst)
 {-# INLINE unfoldl #-}
-
-instance (Foldable f, Functor f) => Foldable (F f) where
-    foldr f r xs = runF xs f (foldr (<<<) id) r
-    {-# INLINE foldr #-}
-
-    foldl' f r xs = runF xs (flip f) (foldr (>>>) id) r
-    {-# INLINE foldl' #-}
