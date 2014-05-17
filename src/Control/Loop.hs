@@ -12,9 +12,14 @@ import Control.Monad.Free (Free(..))
 import Control.Monad.Free.Church
 import Data.Bifunctor
 import Data.Foldable
-import Prelude hiding (foldr)
+import Data.Strict.Maybe
+import Data.Strict.Tuple
+import Prelude hiding (Maybe(..), foldr)
 
-data LoopOp a = forall i. Unfold !i !(i -> Maybe (i, a))
+instance Bifunctor Pair where
+    bimap f g (a :!: b) = f a :!: g b
+
+data LoopOp a = forall i. Unfold !i !(i -> Maybe (Pair i a))
 
 instance Functor LoopOp where
     fmap f op =
@@ -29,7 +34,7 @@ instance Foldable LoopOp where
           let go i =
                 case unf i of
                   Nothing -> r0
-                  Just (i', a) -> f a $ go i'
+                  Just (i' :!: a) -> f a $ go i'
           in go i0
     {-# INLINE foldr #-}
 
@@ -39,19 +44,19 @@ instance Foldable LoopOp where
           let go i r =
                 case unf i of
                   Nothing -> r
-                  Just (i', a) -> go i' $! f r a
+                  Just (i' :!: a) -> go i' $! f r a
           in go i0 r0
     {-# INLINE foldl' #-}
 
 type Loop = F LoopOp
 
-unfoldl :: MonadFree LoopOp m => (i -> Maybe (i, r)) -> i -> m r
+unfoldl :: MonadFree LoopOp m => (i -> Maybe (Pair i r)) -> i -> m r
 unfoldl unf i0 = liftF $ Unfold i0 unf
 
 for :: MonadFree LoopOp m => i -> (i -> Bool) -> (i -> i) -> m i
 for i0 cont next = unfoldl unf i0
   where
-    unf i | cont i = Just (next i, i)
+    unf i | cont i = Just $! next i :!: i
           | otherwise = Nothing
 
 instance (Foldable f, Functor f) => Foldable (F f) where
