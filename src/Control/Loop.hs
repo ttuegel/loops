@@ -27,9 +27,9 @@ instance Foldable LoopPrim where
     foldr f r0 prim =
       case prim of
         For i0 check next g ->
-          let go i | check i = f (g i) $ go $ next i
-                   | otherwise = r0
-          in go i0
+          let _for i | check i = f (g i) $ _for $ next i
+                     | otherwise = r0
+          in _for i0
     {-# INLINE foldr #-}
 
     foldl' f r0 prim =
