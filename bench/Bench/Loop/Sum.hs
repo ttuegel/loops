@@ -24,4 +24,4 @@ bench_sum_foldr_vector :: Int -> Int
 bench_sum_foldr_vector n = V.foldr (+) 0 $ V.enumFromTo 0 n
 
 bench_sum_foldl_LoopPrim :: Int -> Int
-bench_sum_foldl_LoopPrim n = foldl' (+) 0 $ (For 0 (<= n) (+ 1) :: LoopPrim Int)
+bench_sum_foldl_LoopPrim n = foldl' (+) 0 $ (For 0 (<= n) (+ 1) id :: LoopPrim Int)
