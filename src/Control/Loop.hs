@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Control.Loop
-    ( Loop
+    ( Loop, LoopT
     , unfoldl, for
     , module Control.Monad.Trans.Class
     ) where
@@ -10,6 +10,7 @@ module Control.Loop
 import Control.Monad.Trans.Class
 import Control.Monad.Free (Free(..))
 import Control.Monad.Free.Church
+import Control.Monad.Trans.Free.Church hiding (F(..), fromF)
 import Data.Bifunctor
 import Data.Foldable
 import Data.Strict.Maybe
@@ -49,6 +50,7 @@ instance Foldable LoopOp where
     {-# INLINE foldl' #-}
 
 type Loop = F LoopOp
+type LoopT = FT LoopOp
 
 unfoldl :: MonadFree LoopOp m => (i -> Maybe (Pair i r)) -> i -> m r
 unfoldl unf i0 = liftF $ Unfold i0 unf
