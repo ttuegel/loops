@@ -2,16 +2,14 @@ module Test.Loop.Sum where
 
 import Control.Loop
 import Data.Foldable
-import Data.Strict.Maybe
-import Data.Strict.Tuple
-import Prelude hiding (Maybe(..), foldr)
+import Prelude hiding (foldr)
 import Test.Tasty.QuickCheck
 
 fromList :: [a] -> Loop a
 fromList = unfoldl go
   where
     go [] = Nothing
-    go (x:xs) = Just $! xs :!: x
+    go (x:xs) = Just (xs, x)
 
 foldlList :: (b -> a -> b) -> b -> [a] -> b
 foldlList = foldl'

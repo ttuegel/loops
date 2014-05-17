@@ -2,64 +2,63 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Control.Loop
-    ( Loop, LoopT
-    , unfoldl, for
+    ( Loop, LoopT, LoopPrim(..)
+    , for, unfoldl
     , module Control.Monad.Trans.Class
     ) where
 
 import Control.Monad.Trans.Class
 import Control.Monad.Free (Free(..))
 import Control.Monad.Free.Church
-import Control.Monad.Trans.Free.Church hiding (F(..), fromF)
-import Data.Bifunctor
+import Control.Monad.Trans.Free.Church hiding (F, fromF)
 import Data.Foldable
-import Data.Strict.Maybe
-import Data.Strict.Tuple
-import Prelude hiding (Maybe(..), foldr)
+import Data.Maybe (fromJust, isJust)
+import Prelude hiding (foldr)
 
-instance Bifunctor Pair where
-    bimap f g (a :!: b) = f a :!: g b
+data LoopPrim a = For a (a -> Bool) (a -> a) | forall b. Map (LoopPrim b) (b -> a)
 
-data LoopOp a = forall i. Unfold !i !(i -> Maybe (Pair i a))
-
-instance Functor LoopOp where
-    fmap f op =
-        case op of
-          Unfold i0 unf -> Unfold i0 $ fmap (second f) . unf
+instance Functor LoopPrim where
+    fmap f prim =
+      case prim of
+        Map prim' g -> Map prim' (f . g)
+        _ -> Map prim f
     {-# INLINE fmap #-}
 
-instance Foldable LoopOp where
-    foldr f r0 op =
-      case op of
-        Unfold i0 unf ->
-          let go i =
-                case unf i of
-                  Nothing -> r0
-                  Just (i' :!: a) -> f a $ go i'
+instance Foldable LoopPrim where
+    foldr f r0 prim =
+      case prim of
+        Map prim' g -> foldr (f . g) r0 prim'
+        For i0 check next ->
+          let go i | check i = f i $ go $ next i
+                   | otherwise = r0
           in go i0
     {-# INLINE foldr #-}
 
-    foldl' f r0 op =
-      case op of
-        Unfold i0 unf ->
-          let go i r =
-                case unf i of
-                  Nothing -> r
-                  Just (i' :!: a) -> go i' $! f r a
-          in go i0 r0
+    foldl' = go where
+      go :: (r -> a -> r) -> r -> LoopPrim a -> r
+      go f r0 prim =
+        case prim of
+          Map prim' g -> go (\r -> f r . g) r0 prim'
+          For i0 check next ->
+            let _for i r
+                  | check i =
+                    let i' = next i
+                        r' = f r i
+                    in i' `seq` r `seq` _for i' r'
+                  | otherwise = r
+            in _for i0 r0
     {-# INLINE foldl' #-}
 
-type Loop = F LoopOp
-type LoopT = FT LoopOp
+type Loop = F LoopPrim
+type LoopT = FT LoopPrim
 
-unfoldl :: MonadFree LoopOp m => (i -> Maybe (Pair i r)) -> i -> m r
-unfoldl unf i0 = liftF $ Unfold i0 unf
+for :: MonadFree LoopPrim m => i -> (i -> Bool) -> (i -> i) -> m i
+for i0 check next = liftF $ For i0 check next
+{-# INLINE for #-}
 
-for :: MonadFree LoopOp m => i -> (i -> Bool) -> (i -> i) -> m i
-for i0 cont next = unfoldl unf i0
-  where
-    unf i | cont i = Just $! next i :!: i
-          | otherwise = Nothing
+unfoldl :: (Functor m, MonadFree LoopPrim m) => (i -> Maybe (i, r)) -> i -> m r
+unfoldl unf i0 = fmap (fromJust . fmap snd) $ for (unf i0) isJust (>>= unf . fst)
+{-# INLINE unfoldl #-}
 
 instance (Foldable f, Functor f) => Foldable (F f) where
     foldr f r = foldr f r . (fromF :: Functor f => F f a -> Free f a)
