@@ -17,6 +17,7 @@ main = defaultMain
             , bgroup "foldr"
                 [ bench "list" $ nf bench_sum_foldr_list iters
                 , bench "vector" $ nf bench_sum_foldr_vector iters
+                , bench "LoopPrim" $ nf bench_sum_foldr_LoopPrim iters
                 , bench "loop" $ nf bench_sum_foldr_loop iters
                 ]
             ]
