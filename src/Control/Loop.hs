@@ -4,7 +4,7 @@
 module Control.Loop
     ( Loop, LoopT, LoopPrim(..)
     , continue
-    , for, unfoldl
+    , for, unfoldl, loopT
     , module Control.Monad.Trans.Class
     ) where
 
@@ -61,3 +61,7 @@ unfoldl unf i0 = fmap (fromJust . fmap snd) $ for (unf i0) isJust (>>= unf . fst
 continue :: MonadFree LoopPrim m => m r
 continue = liftF $ Continue
 {-# INLINE continue #-}
+
+loopT :: Monad m => LoopT m () -> m ()
+loopT = iterT (foldl' (>>) (return ()))
+{-# INLINE loopT #-}
