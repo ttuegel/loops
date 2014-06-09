@@ -11,7 +11,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Thomas Tuegel
 maintainer:          ttuegel@gmail.com
--- copyright:
+copyright:           (c) Thomas Tuegel 2014
 category:            Control
 build-type:          Simple
 -- extra-source-files:

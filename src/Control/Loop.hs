@@ -5,11 +5,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Control.Loop
-    ( Loop, LoopT, LoopPrim(..)
+    (
+    -- * Loops
+      Loop, LoopT, LoopPrim(..)
+    , module Control.Monad.Trans.Class
     , continue
     , for, unfoldl, loopT
+    -- * Iterating over containers
     , ForEach(..)
-    , module Control.Monad.Trans.Class
     ) where
 
 import Control.Applicative ((<$>))
@@ -19,6 +22,9 @@ import Control.Monad.Free.Church
 import Control.Monad.Trans.Free.Church hiding (F, fromF, runF)
 import Data.Foldable
 import Data.Maybe (fromJust, isJust)
+import Prelude hiding (foldr)
+
+-- Import the vector package qualified to write the ForEach instances
 import qualified Data.Vector as V
 import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Generic as G
@@ -29,8 +35,8 @@ import qualified Data.Vector.Storable as S
 import qualified Data.Vector.Storable.Mutable as MS
 import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as MU
-import Prelude hiding (foldr)
 
+-- | Primitive commands in the language of loops
 data LoopPrim a = forall b. For b (b -> Bool) (b -> b) (b -> a) | Continue
 
 instance Functor LoopPrim where
@@ -63,7 +69,11 @@ instance Foldable LoopPrim where
         Continue -> r0
     {-# INLINE foldl' #-}
 
+-- | Pure loops, usually executed through the 'Foldable' instance of 'F'.
 type Loop = F LoopPrim
+
+-- | Loop monad transformer, i.e., loops in another monad. Loops are
+-- executed in the underlying monad with 'loopT'.
 type LoopT = FT LoopPrim
 
 for :: MonadFree LoopPrim m => i -> (i -> Bool) -> (i -> i) -> m i
@@ -74,18 +84,27 @@ unfoldl :: (Functor m, MonadFree LoopPrim m) => (i -> Maybe (i, r)) -> i -> m r
 unfoldl unf i0 = fromJust . fmap snd <$> for (unf i0) isJust (>>= unf . fst)
 {-# INLINE unfoldl #-}
 
+-- | Emit no value in the current iteration and skip to the start of the
+-- next iteration.
 continue :: MonadFree LoopPrim m => m r
 continue = liftF Continue
 {-# INLINE continue #-}
 
+-- | Run a loop monad transformer in the underlying monad.
 loopT :: Monad m => LoopT m () -> m ()
 loopT = iterT $ foldl' (>>) (return ())
 {-# INLINE loopT #-}
 
+-- | Class of containers that can be iterated over. The type of indices and
+-- values in the container are parameterized by associated type families to
+-- allow iterating over containers which place restrictions on the types of
+-- their values (like the types from the @vector@ package).
 class MonadFree LoopPrim m => ForEach m c where
     type ForEachValue c
     type ForEachIx c
+    -- | Iterate over the values in the container.
     forEach :: c -> m (ForEachValue c)
+    -- | Iterate over the indices and the value at each index.
     iforEach :: c -> m (ForEachIx c, ForEachValue c)
 
 instance (Functor m, MonadFree LoopPrim m) => ForEach m [a] where
