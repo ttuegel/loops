@@ -14,7 +14,7 @@ maintainer:          ttuegel@gmail.com
 copyright:           (c) Thomas Tuegel 2014
 category:            Control
 build-type:          Simple
--- extra-source-files:
+extra-source-files:  README.md, README.lhs
 cabal-version:       >=1.10
 
 library
