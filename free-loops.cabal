@@ -26,8 +26,10 @@ library
     base >=4.7 && <5,
     bifunctors >=4.1 && <5,
     free >=4.8 && <5,
+    primitive >=0.5 && <1,
     strict >=0.3 && <1,
-    transformers >=0.3 && <1
+    transformers >=0.3 && <1,
+    vector >=0.10 && <1
   ghc-options: -Wall
   hs-source-dirs: src
   default-language: Haskell2010
