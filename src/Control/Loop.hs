@@ -8,6 +8,7 @@ module Control.Loop
     , module Control.Monad.Trans.Class
     ) where
 
+import Control.Applicative ((<$>))
 import Control.Monad.Trans.Class
 import Control.Monad.Free.Church
 import Control.Monad.Trans.Free.Church hiding (F, fromF, runF)
@@ -55,13 +56,13 @@ for i0 check next = liftF $ For i0 check next id
 {-# INLINE for #-}
 
 unfoldl :: (Functor m, MonadFree LoopPrim m) => (i -> Maybe (i, r)) -> i -> m r
-unfoldl unf i0 = fmap (fromJust . fmap snd) $ for (unf i0) isJust (>>= unf . fst)
+unfoldl unf i0 = fromJust . fmap snd <$> for (unf i0) isJust (>>= unf . fst)
 {-# INLINE unfoldl #-}
 
 continue :: MonadFree LoopPrim m => m r
-continue = liftF $ Continue
+continue = liftF Continue
 {-# INLINE continue #-}
 
 loopT :: Monad m => LoopT m () -> m ()
-loopT = iterT (foldl' (>>) (return ()))
+loopT = iterT $ foldl' (>>) (return ())
 {-# INLINE loopT #-}
