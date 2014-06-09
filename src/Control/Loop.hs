@@ -1,10 +1,14 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Control.Loop
     ( Loop, LoopT, LoopPrim(..)
     , continue
     , for, unfoldl, loopT
+    , ForEach(..)
     , module Control.Monad.Trans.Class
     ) where
 
@@ -66,3 +70,19 @@ continue = liftF Continue
 loopT :: Monad m => LoopT m () -> m ()
 loopT = iterT $ foldl' (>>) (return ())
 {-# INLINE loopT #-}
+
+class MonadFree LoopPrim m => ForEach m c where
+    type ForEachValue c
+    type ForEachIx c
+    forEach :: c -> m (ForEachValue c)
+    iforEach :: c -> m (ForEachIx c, ForEachValue c)
+
+instance (Functor m, MonadFree LoopPrim m) => ForEach m [a] where
+    type ForEachValue [a] = a
+    type ForEachIx [a] = Int
+
+    forEach as = head <$> for as (not . null) tail
+    {-# INLINE forEach #-}
+
+    iforEach = forEach . zip [0..]
+    {-# INLINE iforEach #-}
