@@ -23,10 +23,12 @@ import qualified Data.Vector.Unboxed.Mutable as MU
 
 import Control.Monad.Loop.Internal
 
--- | Class of containers that can be iterated over. The type of indices and
--- values in the container are parameterized by associated type families to
--- allow iterating over containers which place restrictions on the types of
--- their values (like the types from the @vector@ package).
+-- | Class of containers that can be iterated over. The class is
+-- parameterized over a base monad where the values of the container can be
+-- read to allow iterating over mutable structures. The associated type
+-- families parameterize the value and index types of the container,
+-- allowing the class to be instantiated for container types (unboxed or
+-- storable vectors, for example) which do not admit all types as values.
 class ForEach m c where
     type ForEachValue c
     type ForEachIx c
