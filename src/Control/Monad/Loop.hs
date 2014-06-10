@@ -1,14 +1,10 @@
 module Control.Monad.Loop
-    (
-    -- * Loops
-      Loop, LoopT, LoopPrim(..)
+    ( module Control.Monad.Loop.Internal
+    , module Control.Monad.Loop.ForEach
     , module Control.Monad.Trans.Class
-    , continue, for, unfoldl, loopT
-    -- * Iterating over containers
-    , ForEach(..)
     ) where
 
 import Control.Monad.Trans.Class
 
-import Control.Loop.Prim
-import Control.Loop.ForEach
+import Control.Monad.Loop.Internal
+import Control.Monad.Loop.ForEach
