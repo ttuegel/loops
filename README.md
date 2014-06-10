@@ -44,8 +44,7 @@ Now let's do something really silly: let's build the same list with a
 ~~~ {.haskell}
 nestedList' :: [(Int, Int)]
 nestedList' = foldr (:) [] $ do
-    -- explicit type signature disambiguates between the many Foldable types
-    i <- for 0 (<= 3) (+ 1) :: Loop Int
+    i <- for 0 (<= 3) (+ 1)
     j <- for 0 (<= i) (+ 1)
     return (i, j)
 ~~~

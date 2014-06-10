@@ -20,7 +20,10 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Control.Loop
-  -- other-modules:
+    Control.Monad.Loop
+  other-modules:
+    Control.Loop.ForEach
+    Control.Loop.Prim
   -- other-extensions:
   build-depends:
     base >=4.7 && <5,
