@@ -26,8 +26,7 @@ motivated by the `Monad` instance for lists. Consider the following
 module Example where
 
 import Control.Loop
-import Data.Foldable (foldr)
-import Prelude hiding (foldr)
+import Data.Foldable (toList)
 
 -- A list of pairs (i, j) where 0 <= i <= 3 and 0 <= j <= i
 nestedList :: [(Int, Int)]
@@ -52,7 +51,7 @@ Now let's do something really silly: let's build the same list with a
 
 ~~~ {.haskell}
 nestedList' :: [(Int, Int)]
-nestedList' = foldr (:) [] $ do
+nestedList' = toList $ do
     i <- for 0 (<= 3) (+ 1)
     j <- for 0 (<= i) (+ 1)
     return (i, j)
