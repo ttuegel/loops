@@ -3,9 +3,9 @@
 module Control.Monad.Loop.Internal where
 
 import Control.Applicative ((<$>))
-import Control.Monad.Free.Class
-import Control.Monad.Trans.Free.Church
-import Data.Foldable
+import Control.Monad.Free.Class (liftF)
+import Control.Monad.Trans.Free.Church (F, FT(..), iterT)
+import Data.Foldable (Foldable(..))
 import Data.Maybe (fromJust, isJust)
 
 -- | Primitive commands in the language of loops
