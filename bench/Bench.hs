@@ -7,18 +7,20 @@ import Bench.Loop.Sum
 main :: IO ()
 main = defaultMain
     [ bgroup "Loop"
-        [ bgroup "Sum"
+        [ bgroup "sum"
             [ bgroup "foldl"
-                [ bench "list" $ nf bench_sum_foldl_list iters
-                , bench "vector" $ nf bench_sum_foldl_vector iters
+                [ bench "[]" $ nf bench_sum_foldl_list iters
+                , bench "Vector" $ nf bench_sum_foldl_vector iters
                 , bench "LoopPrim" $ nf bench_sum_foldl_LoopPrim iters
-                , bench "loop" $ nf bench_sum_foldl_loop iters
+                , bench "Loop" $ nf bench_sum_foldl_loop iters
+                , bench "LoopT" $ nf bench_sum_foldl_loopT iters
                 ]
             , bgroup "foldr"
-                [ bench "list" $ nf bench_sum_foldr_list iters
-                , bench "vector" $ nf bench_sum_foldr_vector iters
+                [ bench "[]" $ nf bench_sum_foldr_list iters
+                , bench "Vector" $ nf bench_sum_foldr_vector iters
                 , bench "LoopPrim" $ nf bench_sum_foldr_LoopPrim iters
-                , bench "loop" $ nf bench_sum_foldr_loop iters
+                , bench "Loop" $ nf bench_sum_foldr_loop iters
+                , bench "LoopT" $ nf bench_sum_foldr_loopT iters
                 ]
             ]
         ]

@@ -72,6 +72,7 @@ benchmark benchs
     criterion >=0.8 && <1,
     free-loops,
     strict >=0.3 && <1,
+    transformers >=0.3 && <1,
     vector >=0.10 && <1
   ghc-options: -Wall -fliberate-case -fspec-constr
   default-language: Haskell2010
