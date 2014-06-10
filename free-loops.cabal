@@ -7,6 +7,11 @@ description:
   construct nested loops, providing a cleaner syntax than manual recursion.
   Loops cannot allocate intermediate data structures so performance does not
   rely on stream fusion.
+  .
+  For best performance, please compile your code with @-O -fliberate-case
+  -fspec-constr@ or @-O2@. If you are using GHC's LLVM backend, you should also
+  use @-optlo-O2 -optlc-O2@ (by default, GHC sets an LLVM optimization level
+  that is too low). The LLVM backend generally produces faster executables.
 license:             BSD3
 license-file:        LICENSE
 author:              Thomas Tuegel

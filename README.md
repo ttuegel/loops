@@ -6,6 +6,12 @@ Practical summary: Fast, imperative-style loops as a free monad EDSL.
 Academic summary: Loops have the structure of a monad. Bind (`>>=`) nests loops
 and `return x` is a loop with a single iteration over a value `x`.
 
+Optimizations:
+For best performance, please compile your code with `-O -fliberate-case
+-fspec-constr` or `-O2`. If you are using GHC's LLVM backend, you should also
+use `-optlo-O2 -optlc-O2` (by default, GHC sets an LLVM optimization level
+that is too low). The LLVM backend generally produces faster executables.
+
 A silly example
 ---------------
 
