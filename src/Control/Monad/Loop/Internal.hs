@@ -4,6 +4,7 @@ module Control.Monad.Loop.Internal where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)
 import Control.Category ((<<<), (>>>))
+import Control.Monad (unless)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Data.Foldable
@@ -144,3 +145,12 @@ unfoldl
     -> LoopT m a
 {-# INLINE unfoldl #-}
 unfoldl unf i0 = fromJust . fmap snd <$> for (unf i0) isJust (>>= unf . fst)
+
+while
+    :: Monad m
+    => m Bool
+    -> LoopT m ()
+while cond = do
+    forever
+    p <- lift cond
+    unless p break_
