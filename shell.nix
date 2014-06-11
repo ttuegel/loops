@@ -2,14 +2,14 @@
 , hsDevTools ? pkgs.hsDevTools }:
 
 let inherit (haskellPackages)
-      cabal primitive tasty tastyQuickcheck transformers vector;
+      cabal criterion primitive tasty tastyQuickcheck transformers vector;
 in
 cabal.mkDerivation (self: {
   pname = "free-loops";
   version = "0.1.0.0";
   src = ./.;
   buildDepends = [ primitive transformers vector ];
-  testDepends = [ strict tasty tastyQuickcheck ];
+  testDepends = [ criterion tasty tastyQuickcheck ];
   buildTools = hsDevTools haskellPackages;
   meta = {
     description = "Fast imperative-style loops as a free monad EDSL";

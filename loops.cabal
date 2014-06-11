@@ -1,12 +1,11 @@
-name:                free-loops
+name:                loops
 version:             0.1.0.0
-synopsis:            Fast imperative-style loops as a free monad EDSL
+synopsis:            Fast imperative-style loops
 description:
-  @free-loops@ is a library for fast, imperative-style loops in Haskell. The
-  library is implemented as a free monad EDSL. @Do@-notation is used to
-  construct nested loops, providing a cleaner syntax than manual recursion.
-  Loops cannot allocate intermediate data structures so performance does not
-  rely on stream fusion.
+  @loops@ is a library for fast, imperative-style loops in Haskell.
+  @Do@-notation is used to construct nested loops, providing a cleaner syntax
+  than manual recursion.  Loops cannot allocate intermediate data structures so
+  performance does not rely on stream fusion.
   .
   For best performance, please compile your code with @-O2@. You should also
   use GHC's LLVM backend if possible; it generally produces faster executables.
@@ -44,7 +43,7 @@ test-suite tests
     Test.Sum
   build-depends:
     base >=4.7 && <5,
-    free-loops,
+    loops,
     tasty >=0.8 && <1,
     tasty-quickcheck >=0.8 && <1
   ghc-options: -Wall
@@ -61,7 +60,7 @@ benchmark benchs
   build-depends:
     base >=4.7 && <5,
     criterion >=0.8 && <1,
-    free-loops,
+    loops,
     transformers >=0.3 && <1,
     vector >=0.10 && <1
   ghc-options: -Wall

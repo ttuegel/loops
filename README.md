@@ -1,17 +1,14 @@
-free-loops
+loops
 ==========
 
 **Practical summary**
-
 Fast, imperative-style loops as a free monad EDSL.
 
 **Academic Summary**
-
 Loops have the structure of a monad. Bind (`>>=`) nests loops and `return x` is
 a loop with a single iteration over a value `x`.
 
 **Performance**
-
 For best performance, please compile your code with `-O2`. You should also use
 GHC's LLVM backend if possible; it generally produces faster executables.
 
