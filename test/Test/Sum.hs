@@ -1,6 +1,6 @@
 module Test.Sum where
 
-import Control.Monad.Loop
+import Control.Loop
 import Data.Foldable
 import Prelude hiding (foldr)
 import Test.Tasty.QuickCheck

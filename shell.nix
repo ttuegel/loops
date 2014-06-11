@@ -2,14 +2,16 @@
 , hsDevTools ? pkgs.hsDevTools }:
 
 let inherit (haskellPackages)
-      cabal bifunctors free primitive strict tasty tastyQuickcheck transformers
-      vector;
+      cabal bifunctors free primitive profunctors strict tasty tastyQuickcheck
+      transformers vector;
 in
 cabal.mkDerivation (self: {
   pname = "free-loops";
   version = "0.1.0.0";
   src = ./.;
-  buildDepends = [ bifunctors free primitive strict transformers vector ];
+  buildDepends = [
+    bifunctors free primitive profunctors strict transformers vector
+  ];
   testDepends = [ strict tasty tastyQuickcheck ];
   buildTools = hsDevTools haskellPackages;
   meta = {
