@@ -32,9 +32,16 @@ newtype LoopT m a = LoopT
 -- | @Loop@ is a pure loop, without side-effects.
 type Loop = LoopT Identity
 
+-- | @loop@ is just an aid to type inference. For loops over a base monad,
+-- there are usually other constraints that fix the type, but for pure
+-- loops, the compiler often has trouble inferring @Identity@.
+loop :: Loop a -> Loop a
+{-# INLINE loop #-}
+loop = id
+
 instance Functor (LoopT m) where
     {-# INLINE fmap #-}
-    fmap f loop = LoopT $ \yield -> runLoopT loop (lmap f yield)
+    fmap f xs = LoopT $ \yield -> runLoopT xs (lmap f yield)
 
 instance Applicative (LoopT m) where
     {-# INLINE pure #-}
@@ -92,7 +99,7 @@ break_ = LoopT $ \_ _ brk -> brk
 -- | Execute a loop, sequencing the effects and discarding the values.
 exec_ :: Applicative m => LoopT m a -> m ()
 {-# INLINE exec_ #-}
-exec_ loop = runLoopT loop (\_ next _ -> next) (pure ()) (pure ())
+exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate

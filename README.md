@@ -25,7 +25,7 @@ motivated by the `Monad` instance for lists. Consider the following
 ~~~ {.haskell}
 module Example where
 
-import Control.Loop
+import Control.Monad.Loop
 import Data.Foldable (toList)
 
 -- A list of pairs (i, j) where 0 <= i <= 3 and 0 <= j <= i
@@ -51,7 +51,7 @@ Now let's do something really silly: let's build the same list with a
 
 ~~~ {.haskell}
 nestedList' :: [(Int, Int)]
-nestedList' = toList $ do
+nestedList' = toList $ loop $ do  -- 'loop' is just an aid to type inference
     i <- for 0 (<= 3) (+ 1)
     j <- for 0 (<= i) (+ 1)
     return (i, j)
