@@ -25,7 +25,6 @@ library
     Control.Loop
     Control.Loop.ForEach
     Control.Loop.Internal
-    Control.Loop.LoopPrim
     Control.Monad.Loop
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal

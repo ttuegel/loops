@@ -1,30 +1,21 @@
 module Test.Sum where
 
-import Control.Loop
+import qualified Control.Loop as Loop
+import qualified Control.Monad.Loop as LoopT
 import Data.Foldable
 import Prelude hiding (foldr)
 import Test.Tasty.QuickCheck
 
-fromList :: [a] -> Loop a
-fromList = unfoldl go
-  where
-    go [] = Nothing
-    go (x:xs) = Just (xs, x)
+prop_sum_foldl_Loop :: [Int] -> Property
+prop_sum_foldl_Loop xs = foldl' (+) 0 xs === foldl' (+) 0 (Loop.forEach xs)
 
-foldlList :: (b -> a -> b) -> b -> [a] -> b
-foldlList = foldl'
+prop_sum_foldr_Loop :: [Int] -> Property
+prop_sum_foldr_Loop xs = foldr (+) 0 xs === foldr (+) 0 (Loop.forEach xs)
 
-foldlLoop :: (b -> a -> b) -> b -> Loop a -> b
-foldlLoop = foldl'
+prop_sum_foldl_LoopT :: [Int] -> Property
+prop_sum_foldl_LoopT xs =
+    foldl' (+) 0 xs === foldl' (+) 0 (LoopT.forEach xs :: LoopT.Loop Int)
 
-foldrList :: (b -> a -> a) -> a -> [b] -> a
-foldrList = foldr
-
-foldrLoop :: (b -> a -> a) -> a -> Loop b -> a
-foldrLoop = foldr
-
-prop_sum_foldl :: [Int] -> Property
-prop_sum_foldl xs = foldlList (+) 0 xs === foldlLoop (+) 0 (fromList xs)
-
-prop_sum_foldr :: [Int] -> Property
-prop_sum_foldr xs = foldrList (+) 0 xs === foldrLoop (+) 0 (fromList xs)
+prop_sum_foldr_LoopT :: [Int] -> Property
+prop_sum_foldr_LoopT xs =
+    foldr (+) 0 xs === foldr (+) 0 (LoopT.forEach xs :: LoopT.Loop Int)
