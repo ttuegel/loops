@@ -9,7 +9,6 @@ import Control.Monad.Trans.Class
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
-import Data.Profunctor (lmap)
 import Prelude hiding (foldr, iterate)
 
 -- | @LoopT m a@ represents a loop over a base type @m@ that yields a value
@@ -41,7 +40,7 @@ loop = id
 
 instance Functor (LoopT m) where
     {-# INLINE fmap #-}
-    fmap f xs = LoopT $ \yield -> runLoopT xs (lmap f yield)
+    fmap f xs = LoopT $ \yield -> runLoopT xs (yield . f)
 
 instance Applicative (LoopT m) where
     {-# INLINE pure #-}
