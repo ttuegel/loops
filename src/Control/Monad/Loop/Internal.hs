@@ -10,7 +10,7 @@ import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
 import Data.Profunctor (lmap)
-import Prelude hiding (foldr)
+import Prelude hiding (foldr, iterate)
 
 newtype LoopT m a =
     LoopT { runLoopT :: forall r. (a -> m r -> m r -> m r)
@@ -56,32 +56,20 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
         (!>>>) h g = h >>> (g $!)
         inner = runLoopT xs (\a next _ -> (flip f a >>>) <$> next) (pure id) (pure id)
 
-exec_ :: Monad m => LoopT m a -> m ()
+exec_ :: Applicative m => LoopT m a -> m ()
 {-# INLINE exec_ #-}
-exec_ loop = runLoopT loop (\_ next _ -> next) (return ()) (return ())
+exec_ loop = runLoopT loop (\_ next _ -> next) (pure ()) (pure ())
 
 for :: a -> (a -> Bool) -> (a -> a) -> LoopT m a
 {-# INLINE for #-}
-{-
-- The body of this loop was originally:
--
-->  let go a | cond a = yield a $ go $ adv a
-->           | otherwise = next
-->  in go start
--
-- but GHC needed -fspec-constr (-O2) to optimize correctly. In particular,
-- the strictness of the accumulator in foldl' was not being detected; the
-- loop would box and unbox the accumulator on every iteration. Rather than
-- count on users to enable particular flags, I thought it made more sense
-- (for a simple function) to perform the call-pattern specialization by
-- hand. This induces a small overhead in empty loops.
--}
-for start cond adv
-    | cond start = LoopT $ \yield next _ ->
-        let yield' a r = yield a r next
-            go a = yield' a $ let a' = adv a in if cond a' then go a' else next
-        in go start
-    | otherwise = continue_
+for a0 cond adv = iterate a0 adv >>= \a -> if cond a then return a else break_
+
+iterate :: a -> (a -> a) -> LoopT m a
+{-# INLINE iterate #-}
+iterate a0 adv = LoopT $ \yield next _ ->
+    let yield' a r = yield a r next
+        go a = yield' a $ go $ adv a
+    in go a0
 
 unfoldl :: (i -> Maybe (i, a)) -> i -> LoopT m a
 {-# INLINE unfoldl #-}
@@ -95,6 +83,6 @@ continue_ :: LoopT m a
 {-# INLINE continue_ #-}
 continue_ = LoopT $ \_ next _ -> next
 
-break_ :: Loop a
+break_ :: LoopT m a
 {-# INLINE break_ #-}
 break_ = LoopT $ \_ _ brk -> brk

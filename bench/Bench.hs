@@ -11,11 +11,13 @@ main = defaultMain
             [ bench "[]" $ nf bench_sum_foldl_List iters
             , bench "Vector" $ nf bench_sum_foldl_Vector iters
             , bench "Loop" $ nf bench_sum_foldl_Loop iters
+            , bench "LoopT Identity" $ nf bench_sum_foldl_LoopT iters
             ]
         , bgroup "foldr"
             [ bench "[]" $ nf bench_sum_foldr_List iters
             , bench "Vector" $ nf bench_sum_foldr_Vector iters
             , bench "Loop" $ nf bench_sum_foldr_Loop iters
+            , bench "LoopT Identity" $ nf bench_sum_foldr_LoopT iters
             ]
         ]
     ]
