@@ -2,10 +2,10 @@ name:                loops
 version:             0.1.0.0
 synopsis:            Fast imperative-style loops
 description:
-  @loops@ is a library for fast, imperative-style loops in Haskell.
-  @Do@-notation is used to construct nested loops, providing a cleaner syntax
-  than manual recursion.  Loops cannot allocate intermediate data structures so
-  performance does not rely on stream fusion.
+  @loops@ is a library for fast, imperative-style loops in Haskell. Performance
+  is robust because there is no reliance on fusion. @do@-notation nests loops,
+  providing syntax cleaner than manual recursion. A class @ForEach@ is provided
+  enabling iteration over common container types.
   .
   For best performance, please compile your code with @-O2@. You should also
   use GHC's LLVM backend if possible; it generally produces faster executables.

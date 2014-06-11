@@ -2,13 +2,19 @@ loops
 ==========
 
 **Practical summary**
-Fast, imperative-style loops as a free monad EDSL.
+
+Fast, imperative-style loops. Performance is robust because there is no reliance
+on fusion. `do`-notation nests loops, providing syntax cleaner than manual
+recursion. A class `ForEach` is provided enabling iteration over common
+container types.
 
 **Academic Summary**
+
 Loops have the structure of a monad. Bind (`>>=`) nests loops and `return x` is
 a loop with a single iteration over a value `x`.
 
 **Performance**
+
 For best performance, please compile your code with `-O2`. You should also use
 GHC's LLVM backend if possible; it generally produces faster executables.
 
