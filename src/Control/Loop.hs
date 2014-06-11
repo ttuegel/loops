@@ -8,29 +8,32 @@ import Data.Foldable (Foldable(..))
 import Data.Maybe (fromJust, isJust)
 import Data.Profunctor (lmap)
 
-newtype Loop a = Loop { runLoop :: forall r. (a -> r -> r) -> r -> r }
+newtype Loop a = Loop { runLoop :: forall r. (a -> r -> r -> r) -> r -> r -> r }
 
 instance Functor Loop where
     {-# INLINE fmap #-}
-    fmap f loop = Loop $ \yield next -> runLoop loop (lmap f yield) next
+    fmap f loop =
+        Loop $ \yield next brk -> runLoop loop (lmap f yield) next brk
 
 instance Applicative Loop where
     {-# INLINE pure #-}
     pure a = Loop $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    fs <*> as = Loop $ \yield -> runLoop fs $ \f -> runLoop (fmap f as) yield
+    fs <*> as = Loop $ \yield next ->
+        runLoop fs (\f next' _ -> runLoop (fmap f as) yield next' next) next
 
 instance Monad Loop where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
-    as >>= f = Loop $ \yield -> runLoop as $ \a -> runLoop (f a) yield
+    as >>= f = Loop $ \yield next ->
+        runLoop as (\a next' _ -> runLoop (f a) yield next' next) next
 
 instance Foldable Loop where
     {-# INLINE foldr #-}
-    foldr f r xs = runLoop xs f r
+    foldr f r xs = runLoop xs (\a b _ -> f a b) r r
     {-# INLINE foldl' #-}
-    foldl' f r xs = runLoop xs (\a -> (flip f a !>>>)) id r
+    foldl' f r xs = runLoop xs (\a next _ -> flip f a !>>> next) id id r
       where (!>>>) h g = h >>> (g $!)
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
@@ -50,8 +53,9 @@ for :: a -> (a -> Bool) -> (a -> a) -> Loop a
 - hand. This induces a small overhead in empty loops.
 -}
 for start cond adv
-    | cond start = Loop $ \yield next ->
-        let go a = yield a $ let a' = adv a in if cond a' then go a' else next
+    | cond start = Loop $ \yield next _ ->
+        let yield' a r = yield a r next
+            go a = yield' a $ let a' = adv a in if cond a' then go a' else next
         in go start
     | otherwise = continue_
 
@@ -65,4 +69,8 @@ continue a = Loop $ \yield next -> yield a next
 
 continue_ :: Loop a
 {-# INLINE continue_ #-}
-continue_ = Loop $ \_ next -> next
+continue_ = Loop $ \_ next _ -> next
+
+break_ :: Loop a
+{-# INLINE break_ #-}
+break_ = Loop $ \_ _ brk -> brk
