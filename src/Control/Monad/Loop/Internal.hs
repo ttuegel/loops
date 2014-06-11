@@ -2,13 +2,14 @@
 
 module Control.Monad.Loop.Internal where
 
-import Control.Applicative (Applicative(..), (<$>))
+import Control.Applicative (Applicative(..), (<$>), liftA2)
 import Control.Category ((<<<), (>>>))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
+import Data.Traversable (Traversable(..))
 import Prelude hiding (foldr, iterate)
 
 -- | @LoopT m a@ represents a loop over a base type @m@ that yields a value
@@ -77,6 +78,14 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
         (!>>>) h g = h >>> (g $!)
         yield a next _ = (flip f a >>>) <$> next
         inner = runLoopT xs yield (pure id) (pure id)
+
+instance (Applicative m, Foldable m) => Traversable (LoopT m) where
+    {-# INLINE sequenceA #-}
+    sequenceA = foldr (liftA2 cons) (pure continue_)
+
+cons :: a -> LoopT m a -> LoopT m a
+{-# INLINE cons #-}
+cons a as = LoopT $ \yield next brk -> yield a (runLoopT as yield next brk) next
 
 -- | Yield a value for this iteration of the loop and skip immediately to
 -- the next iteration.
