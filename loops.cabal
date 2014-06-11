@@ -19,6 +19,10 @@ build-type:          Simple
 extra-source-files:  README.md, README.lhs
 cabal-version:       >=1.10
 
+source-repository head
+  type: git
+  location: https://github.com/ttuegel/loops.git
+
 library
   exposed-modules:
     Control.Monad.Loop
