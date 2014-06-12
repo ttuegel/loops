@@ -7,7 +7,12 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Control.Monad.Loop.Internal where
+module Control.Monad.Loop.Internal
+    ( LoopT(..), Loop, loop
+    , Unroll(..), UnTL, Unrolling(), noUnroll
+    , cons, continue, continue_, break_, exec_
+    , iterate, forever, for, unfoldl, while
+    ) where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)
 import Control.Category ((<<<), (>>>))
@@ -173,7 +178,6 @@ while unroll = \cond -> do
     p <- lift cond
     unless p break_
 
-type LitNat = TL.Nat
 -- | Proxy type for GHC's type level literal natural numbers. @n@ is the
 -- number of times the loop will be unrolled into its own body.
 data Unroll (n :: TL.Nat) = Unroll
