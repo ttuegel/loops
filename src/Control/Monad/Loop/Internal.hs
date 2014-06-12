@@ -120,24 +120,24 @@ exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
-    :: FiniteIterate (UnTL n)
+    :: Unrolling (UnTL n)
     => Unroll n   -- ^ Unrolling factor
     -> a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
 iterate unroll a0 adv = LoopT $ \yield next _ ->
-    let go a = finiteIterate (fromTypeLit unroll) a adv yield go next
+    let go a = unrollIterate (fromTypeLit unroll) a adv yield go next
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
-forever :: FiniteIterate (UnTL n) => Unroll n -> LoopT m ()
+forever :: Unrolling (UnTL n) => Unroll n -> LoopT m ()
 {-# INLINE forever #-}
 forever unroll = iterate unroll () id
 
 -- | Standard @for@ loop.
 for
-    :: FiniteIterate (UnTL n)
+    :: Unrolling (UnTL n)
     => Unroll n     -- ^ Unrolling factor
     -> a            -- ^ Starting value of iterator
     -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
@@ -146,21 +146,24 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE for #-}
-for unroll a0 cond adv = iterate unroll a0 adv >>= \a -> if cond a then return a else break_
+for unroll a0 cond adv = LoopT $ \yield next _ ->
+    let go a = unrollFor (fromTypeLit unroll) a cond adv yield go next
+    in if cond a0 then go a0 else next
 
 -- | Unfold a loop from the left.
 unfoldl
-    :: FiniteIterate (UnTL n)
+    :: Unrolling (UnTL n)
     => Unroll n             -- ^ Unrolling factor
     -> (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
     -> i                    -- ^ Starting value
     -> LoopT m a
 {-# INLINE unfoldl #-}
-unfoldl unroll unf i0 = fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
+unfoldl unroll unf i0 =
+    fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
 
 while
-    :: (FiniteIterate (UnTL n), Monad m)
+    :: (Unrolling (UnTL n), Monad m)
     => Unroll n
     -> m Bool
     -> LoopT m ()
@@ -192,19 +195,35 @@ type family UnTL (n :: TL.Nat) :: Nat where
 fromTypeLit :: Unroll n -> UnrollInd (UnTL n)
 fromTypeLit Unroll = UnrollInd
 
-class FiniteIterate (n :: Nat) where
-    finiteIterate
+class Unrolling (n :: Nat) where
+    unrollFor
+        :: UnrollInd n
+        -> a -> (a -> Bool) -> (a -> a)  -- for parameters
+        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+
+    unrollIterate
         :: UnrollInd n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
         -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
 
-instance FiniteIterate Z where
-    {-# INLINE finiteIterate #-}
-    finiteIterate UnrollInd a _ _ next _ = next a
+instance Unrolling Z where
+    {-# INLINE unrollFor #-}
+    unrollFor UnrollInd a _ _ _ next _ = next a
 
-instance FiniteIterate n => FiniteIterate (S n) where
-    {-# INLINE finiteIterate #-}
-    finiteIterate unroll a adv yield next brk =
+    {-# INLINE unrollIterate #-}
+    unrollIterate UnrollInd a _ _ next _ = next a
+
+instance Unrolling n => Unrolling (S n) where
+    {-# INLINE unrollFor #-}
+    unrollFor unroll a cond adv yield next brk =
         yield a descend brk
       where
-        descend = finiteIterate (predUnroll unroll) (adv a) adv yield next brk
+        a' = adv a
+        descend | cond a' = unrollFor (predUnroll unroll) a' cond adv yield next brk
+                | otherwise = brk
+
+    {-# INLINE unrollIterate #-}
+    unrollIterate unroll a adv yield next brk =
+        yield a descend brk
+      where
+        descend = unrollIterate (predUnroll unroll) (adv a) adv yield next brk
