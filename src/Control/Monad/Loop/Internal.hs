@@ -1,4 +1,11 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop.Internal where
 
@@ -7,6 +14,7 @@ import Control.Category ((<<<), (>>>))
 import Control.Monad (unless)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import qualified GHC.TypeLits as TL
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
@@ -112,45 +120,88 @@ exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
-    :: a          -- ^ Starting value of iterator
+    :: FiniteIterate (UnTL n)
+    => Unroll n   -- ^ Unrolling factor
+    -> a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
-iterate a0 adv = LoopT $ \yield next _ ->
-    let yield' a r = yield a r next
-        go a = yield' a $ go $ adv a
+iterate unroll a0 adv = LoopT $ \yield next _ ->
+    let go a = finiteIterate (fromTypeLit unroll) a adv yield go next
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
-forever :: LoopT m ()
+forever :: FiniteIterate (UnTL n) => Unroll n -> LoopT m ()
 {-# INLINE forever #-}
-forever = iterate () id
+forever unroll = iterate unroll () id
 
 -- | Standard @for@ loop.
 for
-    :: a            -- ^ Starting value of iterator
+    :: FiniteIterate (UnTL n)
+    => Unroll n     -- ^ Unrolling factor
+    -> a            -- ^ Starting value of iterator
     -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
                     -- first time this is false. The termination condition
                     -- is checked at the /start/ of each iteration.
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE for #-}
-for a0 cond adv = iterate a0 adv >>= \a -> if cond a then return a else break_
+for unroll a0 cond adv = iterate unroll a0 adv >>= \a -> if cond a then return a else break_
 
 -- | Unfold a loop from the left.
 unfoldl
-    :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
+    :: FiniteIterate (UnTL n)
+    => Unroll n             -- ^ Unrolling factor
+    -> (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
     -> i                    -- ^ Starting value
     -> LoopT m a
 {-# INLINE unfoldl #-}
-unfoldl unf i0 = fromJust . fmap snd <$> for (unf i0) isJust (>>= unf . fst)
+unfoldl unroll unf i0 = fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
 
 while
-    :: Monad m
-    => m Bool
+    :: (FiniteIterate (UnTL n), Monad m)
+    => Unroll n
+    -> m Bool
     -> LoopT m ()
-while cond = do
-    forever
+{-# INLINE while #-}
+while unroll cond = do
+    forever unroll
     p <- lift cond
     unless p break_
+
+type LitNat = TL.Nat
+
+data Nat = S !Nat | Z
+data Unroll (n :: TL.Nat) = Unroll
+data UnrollInd (n :: Nat) = UnrollInd
+
+noUnroll :: Unroll 1
+noUnroll = Unroll
+
+predUnroll :: UnrollInd (S n) -> UnrollInd n
+predUnroll UnrollInd = UnrollInd
+
+type family UnTL (n :: TL.Nat) :: Nat where
+    UnTL 0 = Z
+    UnTL n = S (UnTL ((TL.-) n 1))
+
+fromTypeLit :: Unroll n -> UnrollInd (UnTL n)
+fromTypeLit Unroll = UnrollInd
+
+class FiniteIterate (n :: Nat) where
+    finiteIterate
+        :: UnrollInd n  -- unrolling factor
+        -> a -> (a -> a)  -- iterate parameters
+        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+
+instance FiniteIterate Z where
+    {-# INLINE finiteIterate #-}
+    finiteIterate UnrollInd a _ _ next _ = next a
+
+instance FiniteIterate n => FiniteIterate (S n) where
+    {-# INLINE finiteIterate #-}
+    finiteIterate unroll a adv yield next brk =
+        yield a descend brk
+      where
+        descend = finiteIterate (predUnroll unroll) (adv a) adv yield next brk

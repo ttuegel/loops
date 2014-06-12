@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
     Control.Monad.Loop
+    Control.Monad.Loop.Unroll
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
   build-depends:

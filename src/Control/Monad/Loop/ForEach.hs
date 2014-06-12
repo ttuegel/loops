@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -31,18 +32,18 @@ class ForEach m c where
     type ForEachValue c
     type ForEachIx c
     -- | Iterate over the values in the container.
-    forEach :: c -> m (ForEachValue c)
+    forEach :: FiniteIterate (UnTL n) => Unroll n -> c -> m (ForEachValue c)
     -- | Iterate over the indices and the value at each index.
-    iforEach :: c -> m (ForEachIx c, ForEachValue c)
+    iforEach :: FiniteIterate (UnTL n) => Unroll n -> c -> m (ForEachIx c, ForEachValue c)
 
 instance (Monad m) => ForEach (LoopT m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
-    forEach as = liftM head $ for as (not . null) tail
+    forEach unroll as = liftM head $ for unroll as (not . null) tail
     {-# INLINE forEach #-}
 
-    iforEach = forEach . zip [0..]
+    iforEach unroll = forEach unroll . zip [0..]
     {-# INLINE iforEach #-}
 
 instance (Monad m) => ForEach (LoopT m) (V.Vector a) where
@@ -77,15 +78,15 @@ instance (Monad m, S.Storable a) => ForEach (LoopT m) (S.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachVector :: (Monad m, G.Vector v a) => v a -> LoopT m a
+forEachVector :: (Monad m, G.Vector v a, FiniteIterate (UnTL n)) => Unroll n -> v a -> LoopT m a
 {-# INLINE forEachVector #-}
-forEachVector = liftM snd . iforEachVector
+forEachVector unroll = liftM snd . iforEachVector unroll
 
-iforEachVector :: (Monad m, G.Vector v a) => v a -> LoopT m (Int, a)
+iforEachVector :: (Monad m, G.Vector v a, FiniteIterate (UnTL n)) => Unroll n -> v a -> LoopT m (Int, a)
 {-# INLINE iforEachVector #-}
-iforEachVector v = do
+iforEachVector unroll v = do
     let len = G.length v
-    i <- for 0 (< len) (+ 1)
+    i <- for unroll 0 (< len) (+ 1)
     x <- G.unsafeIndexM v i
     return (i, x)
 
@@ -121,15 +122,15 @@ instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopT m) (MS.M
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopT m a
+forEachMVector :: (PrimMonad m, MG.MVector v a, FiniteIterate (UnTL n)) => Unroll n -> v (PrimState m) a -> LoopT m a
 {-# INLINE forEachMVector #-}
-forEachMVector = liftM snd . iforEachMVector
+forEachMVector unroll = liftM snd . iforEachMVector unroll
 
-iforEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopT m (Int, a)
+iforEachMVector :: (PrimMonad m, MG.MVector v a, FiniteIterate (UnTL n)) => Unroll n -> v (PrimState m) a -> LoopT m (Int, a)
 {-# INLINE iforEachMVector #-}
-iforEachMVector v = do
+iforEachMVector unroll v = do
     let len = MG.length v
-    i <- for 0 (< len) (+ 1)
+    i <- for unroll 0 (< len) (+ 1)
     x <- lift $ MG.unsafeRead v i
     return (i, x)
 
