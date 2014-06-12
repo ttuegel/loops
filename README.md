@@ -1,6 +1,8 @@
 loops
 ==========
 
+[![Build Status](https://travis-ci.org/ttuegel/loops.svg?branch=master)](https://travis-ci.org/ttuegel/loops)
+
 **Practical summary**
 
 Fast, imperative-style loops. Performance is robust because there is no reliance
