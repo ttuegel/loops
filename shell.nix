@@ -6,11 +6,12 @@ let inherit (haskellPackages)
 in
 cabal.mkDerivation (self: {
   pname = "free-loops";
-  version = "0.1.0.0";
+  version = "0.2.0.0";
   src = ./.;
   buildDepends = [ primitive transformers vector ];
   testDepends = [ criterion tasty tastyQuickcheck ];
   buildTools = hsDevTools haskellPackages;
+  hyperlinkSource = true;
   meta = {
     description = "Fast imperative-style loops as a free monad EDSL";
     license = self.stdenv.lib.licenses.bsd3;
