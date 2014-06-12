@@ -62,8 +62,6 @@ benchmark benchs
     bench
   main-is:
     Bench.hs
-  other-modules:
-    Bench.Sum
   build-depends:
     base >=4.6 && <5,
     criterion >=0.8 && <1,

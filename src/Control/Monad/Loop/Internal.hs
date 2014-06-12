@@ -171,11 +171,14 @@ while unroll cond = do
     unless p break_
 
 type LitNat = TL.Nat
+-- | Proxy type for GHC's type level literal natural numbers. @n@ is the
+-- number of times the loop will be unrolled into its own body.
+data Unroll (n :: TL.Nat) = Unroll
 
 data Nat = S !Nat | Z
-data Unroll (n :: TL.Nat) = Unroll
 data UnrollInd (n :: Nat) = UnrollInd
 
+-- | Do not unroll the loop at all.
 noUnroll :: Unroll 1
 noUnroll = Unroll
 
@@ -183,7 +186,7 @@ predUnroll :: UnrollInd (S n) -> UnrollInd n
 predUnroll UnrollInd = UnrollInd
 
 type family UnTL (n :: TL.Nat) :: Nat where
-    UnTL 0 = Z
+    UnTL 1 = S Z
     UnTL n = S (UnTL ((TL.-) n 1))
 
 fromTypeLit :: Unroll n -> UnrollInd (UnTL n)
