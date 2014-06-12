@@ -4,7 +4,7 @@
 module Control.Monad.Loop.ForEach where
 
 import Control.Monad (liftM)
-import Control.Monad.Primitive (PrimMonad(PrimState))
+import Control.Monad.Primitive (PrimMonad, PrimState)
 import Control.Monad.Trans.Class (lift)
 
 -- Import the vector package qualified to write the ForEach instances
