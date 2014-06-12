@@ -2,10 +2,20 @@ name:                loops
 version:             0.1.0.1
 synopsis:            Fast imperative-style loops
 description:
-  @loops@ is a library for fast, imperative-style loops in Haskell. Performance
-  is robust because there is no reliance on fusion. @do@-notation nests loops,
-  providing syntax cleaner than manual recursion. A class @ForEach@ is provided
-  enabling iteration over common container types.
+  @loops@ is a library for fast, imperative-style loops with a clean syntax.
+  .
+  __Features__
+  .
+  * Fast, imperative-style loops with a clean syntax. Bind (`>>=`) nests loops,
+    so in `do`-notation, each subsequent line is nested inside loops that appear
+    above it.
+  * Iteration over common data structures, like lists and vectors.
+  * Robust performance because there is no reliance on fusion.
+  * __NEW!__ Loop-unrolling to arbitrary depth. Unrollable loop combinators are
+    provided in `Control.Monad.Loop.Unroll`. (The simple, "rolled" interface is
+    still provided in `Control.Monad.Loop`.) The unrolling depth set at the call
+    site at compile time. My benchmarks show that folding over unrolled loops is
+    up to 25% faster than folding over unboxed vectors!
   .
   For best performance, please compile your code with @-O2@. You should also
   use GHC's LLVM backend if possible; it generally produces faster executables.

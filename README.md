@@ -3,17 +3,23 @@ loops
 
 [![Build Status](https://travis-ci.org/ttuegel/loops.svg?branch=master)](https://travis-ci.org/ttuegel/loops)
 
-**Practical summary**
-
-Fast, imperative-style loops. Performance is robust because there is no reliance
-on fusion. `do`-notation nests loops, providing syntax cleaner than manual
-recursion. A class `ForEach` is provided enabling iteration over common
-container types.
-
 **Academic Summary**
 
 Loops have the structure of a monad. Bind (`>>=`) nests loops and `return x` is
 a loop with a single iteration over a value `x`.
+
+**Features**
+
+* Fast, imperative-style loops with a clean syntax. Bind (`>>=`) nests loops, so
+  in `do`-notation, each subsequent line is nested inside loops that appear
+  above it.
+* Iteration over common data structures, like lists and vectors.
+* Robust performance because there is no reliance on fusion.
+* **NEW!** Loop-unrolling to arbitrary depth. Unrollable loop combinators are
+  provided in `Control.Monad.Loop.Unroll`. (The simple, "rolled" interface is
+  still provided in `Control.Monad.Loop`.) The unrolling depth set at the call
+  site at compile time. My benchmarks show that folding over unrolled loops is
+  up to 25% faster than folding over unboxed vectors!
 
 **Performance**
 
@@ -68,14 +74,11 @@ familiar with.
 
 The correspondence between the list monad and the loop monad is not a
 coincidence! GHC uses stream fusion to reduce (some) uses of lists to simple
-loops so that the evaluated list is never held in memory. Unfortunately,
-using lists as loops is dangerous in performance-sensitive code because the
-fusion rules may fail to fire, leaving you with a fully-evaluated list on
-the heap! Libraries that rely on fusion require extensive use of inlining,
-which increases compile time and memory usage dramatically.  These are the
-limitations that inspired me to write this library. A `Loop` can only
-evaluate one iteration at a time, so there is no larger data structure that
-needs to be fused. Consequently, performance is less fragile.
+loops so that the evaluated list is never held in memory. Unfortunately, using
+lists as loops is dangerous in performance-sensitive code because the fusion
+rules may fail to fire, leaving you with a fully-evaluated list on the heap! A
+`Loop` can only evaluate one iteration at a time, so there is no larger data
+structure that needs to be fused. Consequently, performance is less fragile.
 
 You might complain that this style of programming does not fit Haskell very
 well, but I would contend just the opposite. As I mentioned above, lists are the
