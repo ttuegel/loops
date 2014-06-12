@@ -29,7 +29,7 @@ library
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
   build-depends:
-    base >=4.7 && <5,
+    base >=4.6 && <5,
     primitive >=0.5 && <1,
     transformers >=0.3 && <1,
     vector >=0.10 && <1
@@ -46,7 +46,7 @@ test-suite tests
   other-modules:
     Test.Sum
   build-depends:
-    base >=4.7 && <5,
+    base >=4.6 && <5,
     loops,
     tasty >=0.8 && <1,
     tasty-quickcheck >=0.8 && <1
@@ -62,7 +62,7 @@ benchmark benchs
   other-modules:
     Bench.Sum
   build-depends:
-    base >=4.7 && <5,
+    base >=4.6 && <5,
     criterion >=0.8 && <1,
     loops,
     transformers >=0.3 && <1,
