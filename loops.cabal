@@ -4,14 +4,17 @@ synopsis:            Fast imperative-style loops
 description:
   @loops@ is a library for fast, imperative-style loops with a clean syntax.
   .
-  __Features__
+  Features
   .
   * Fast, imperative-style loops with a clean syntax. Bind (`>>=`) nests loops,
     so in `do`-notation, each subsequent line is nested inside loops that appear
     above it.
+  .
   * Iteration over common data structures, like lists and vectors.
+  .
   * Robust performance because there is no reliance on fusion.
-  * __NEW!__ Loop-unrolling to arbitrary depth. Unrollable loop combinators are
+  .
+  * NEW! Loop-unrolling to arbitrary depth. Unrollable loop combinators are
     provided in `Control.Monad.Loop.Unroll`. (The simple, "rolled" interface is
     still provided in `Control.Monad.Loop`.) The unrolling depth set at the call
     site at compile time. My benchmarks show that folding over unrolled loops is
