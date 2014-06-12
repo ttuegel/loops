@@ -40,7 +40,7 @@ instance (Monad m) => ForEach (LoopT m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
-    forEach unroll as = liftM head $ for unroll as (not . null) tail
+    forEach unroll = \as -> liftM head $ for unroll as (not . null) tail
     {-# INLINE forEach #-}
 
     iforEach unroll = forEach unroll . zip [0..]
@@ -84,7 +84,7 @@ forEachVector unroll = liftM snd . iforEachVector unroll
 
 iforEachVector :: (Monad m, G.Vector v a, Unrolling (UnTL n)) => Unroll n -> v a -> LoopT m (Int, a)
 {-# INLINE iforEachVector #-}
-iforEachVector unroll v = do
+iforEachVector unroll = \v -> do
     let len = G.length v
     i <- for unroll 0 (< len) (+ 1)
     x <- G.unsafeIndexM v i
@@ -128,7 +128,7 @@ forEachMVector unroll = liftM snd . iforEachMVector unroll
 
 iforEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling (UnTL n)) => Unroll n -> v (PrimState m) a -> LoopT m (Int, a)
 {-# INLINE iforEachMVector #-}
-iforEachMVector unroll v = do
+iforEachMVector unroll = \v -> do
     let len = MG.length v
     i <- for unroll 0 (< len) (+ 1)
     x <- lift $ MG.unsafeRead v i

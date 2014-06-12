@@ -126,7 +126,7 @@ iterate
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
-iterate unroll a0 adv = LoopT $ \yield next _ ->
+iterate unroll = \a0 adv -> LoopT $ \yield next _ ->
     let go a = unrollIterate (fromTypeLit unroll) a adv yield go next
     in go a0
 
@@ -146,7 +146,7 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE for #-}
-for unroll a0 cond adv = LoopT $ \yield next _ ->
+for unroll = \a0 cond adv -> LoopT $ \yield next _ ->
     let go a = unrollFor (fromTypeLit unroll) a cond adv yield go next
     in if cond a0 then go a0 else next
 
@@ -159,7 +159,7 @@ unfoldl
     -> i                    -- ^ Starting value
     -> LoopT m a
 {-# INLINE unfoldl #-}
-unfoldl unroll unf i0 =
+unfoldl unroll = \unf i0 ->
     fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
 
 while
@@ -168,7 +168,7 @@ while
     -> m Bool
     -> LoopT m ()
 {-# INLINE while #-}
-while unroll cond = do
+while unroll = \cond -> do
     forever unroll
     p <- lift cond
     unless p break_
