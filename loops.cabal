@@ -1,5 +1,5 @@
 name:                loops
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Fast imperative-style loops
 description:
   @loops@ is a library for fast, imperative-style loops in Haskell. Performance
@@ -13,11 +13,13 @@ license:             BSD3
 license-file:        LICENSE
 author:              Thomas Tuegel
 maintainer:          ttuegel@gmail.com
+bug-reports:         https://github.com/ttuegel/loops/issues
 copyright:           (c) Thomas Tuegel 2014
 category:            Control
 build-type:          Simple
 extra-source-files:  README.md, README.lhs
 cabal-version:       >=1.10
+tested-with:         GHC == 7.6.3, GHC == 7.8.2
 
 source-repository head
   type: git
