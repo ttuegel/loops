@@ -33,15 +33,7 @@ import Prelude hiding (foldr, iterate)
 -- (for 'exec_'). If @m@ is also 'Foldable', so is @LoopT m@. For any other
 -- type, you may use 'runLoopT'.
 newtype LoopT m a = LoopT
-    { runLoopT
-        :: forall r. (a -> m r -> m r -> m r)
-          -- ^ Yield a value to the inner loop. The inner loop will call
-          -- the second argument to continue and the third argument to
-          -- break.
-        -> m r  -- ^ Continue
-        -> m r  -- ^ Break
-        -> m r
-    }
+    { runLoopT :: forall r. (a -> m r -> m r -> m r) -> m r -> m r -> m r }
 
 -- | @Loop@ is a pure loop, without side-effects.
 type Loop = LoopT Identity
