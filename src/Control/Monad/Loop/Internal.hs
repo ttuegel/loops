@@ -54,14 +54,14 @@ instance Applicative (LoopT m) where
     pure a = LoopT $ \yield -> yield a
     {-# INLINE (<*>) #-}
     fs <*> as = LoopT $ \yield next ->
-        runLoopT fs (\f next' _ -> runLoopT (fmap f as) yield next' next) next
+        runLoopT fs (\f -> runLoopT (fmap f as) yield) next
 
 instance Monad (LoopT m) where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
     as >>= f = LoopT $ \yield next ->
-        runLoopT as (\a next' _ -> runLoopT (f a) yield next' next) next
+        runLoopT as (\a -> runLoopT (f a) yield) next
 
 instance MonadTrans LoopT where
     {-# INLINE lift #-}
