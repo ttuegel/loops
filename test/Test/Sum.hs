@@ -29,3 +29,15 @@ prop_sum_foldr_LoopT_Unroll xs =
   where
     unroll :: Unroll.Unroll 8
     unroll = Unroll.Unroll
+
+prop_break_order :: [Int] -> Property
+prop_break_order xs =
+    foldl' (+) 0 before === foldl' (+) 0 after
+  where
+    before = LoopT.loop $ do
+      x <- LoopT.forEach xs
+      if x < 10 then LoopT.continue 10 else LoopT.break_
+    after = LoopT.loop $ do
+      x <- LoopT.forEach xs
+      return ()
+      if x < 10 then LoopT.continue 10 else LoopT.break_

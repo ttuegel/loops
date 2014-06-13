@@ -12,5 +12,6 @@ main = defaultMain $ testGroup "Tests"
       , QC.testProperty "foldr" prop_sum_foldr_LoopT
       , QC.testProperty "foldl (Unroll)" prop_sum_foldl_LoopT_Unroll
       , QC.testProperty "foldr (Unroll)" prop_sum_foldr_LoopT_Unroll
+      , QC.testProperty "break order" prop_break_order
       ]
   ]
