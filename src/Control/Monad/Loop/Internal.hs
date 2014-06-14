@@ -10,7 +10,7 @@
 module Control.Monad.Loop.Internal
     ( LoopT(..), Loop, loop
     , Unroll(..), UnTL, Unrolling(), noUnroll
-    , cons, continue, continue_, break_, exec_
+    , cons, continue, continue_, break, break_, exec_
     , iterate, forever, for, unfoldl, while
     ) where
 
@@ -24,7 +24,7 @@ import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
 import Data.Traversable (Traversable(..))
-import Prelude hiding (foldr, iterate)
+import Prelude hiding (foldr, iterate, break)
 
 -- | @LoopT m a@ represents a loop over a base type @m@ that yields a value
 -- @a@ at each iteration. It can be used as a monad transformer, but there
@@ -95,6 +95,8 @@ cons a as = LoopT $ \yield next brk -> yield a (runLoopT as yield next brk) next
 
 -- | Yield a value for this iteration of the loop and skip immediately to
 -- the next iteration.
+--
+-- Same as pure / return.
 continue :: a -> LoopT m a
 {-# INLINE continue #-}
 continue a = LoopT $ \yield next -> yield a next
@@ -104,6 +106,12 @@ continue a = LoopT $ \yield next -> yield a next
 continue_ :: LoopT m a
 {-# INLINE continue_ #-}
 continue_ = LoopT $ \_ next _ -> next
+
+-- | Yield a value for this iteration of the loop and skip all the remaining
+-- iterations of the immediately-enclosing loop.
+break :: a -> LoopT m a
+{-# INLINE break #-}
+break a = LoopT $ \yield _ brk -> yield a brk brk
 
 -- | Skip all the remaining iterations of the immediately-enclosing loop.
 break_ :: LoopT m a
