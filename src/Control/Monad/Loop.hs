@@ -1,6 +1,6 @@
 module Control.Monad.Loop
     ( LoopT(..), Loop, loop
-    , cons, continue, continue_, break_, exec_
+    , cons, continue, continue_, break, break_, exec_
     , ForEach(ForEachValue, ForEachIx)
     , iterate, forever, for, unfoldl, while
     , forEach, iforEach
@@ -8,12 +8,12 @@ module Control.Monad.Loop
 
 import Control.Monad.Loop.Unroll
     ( LoopT(..), Loop, loop
-    , cons, continue, continue_, break_, exec_
+    , cons, continue, continue_, break, break_, exec_
     , ForEach(ForEachValue, ForEachIx)
     , noUnroll
     )
 import qualified Control.Monad.Loop.Unroll as U
-import Prelude hiding (iterate)
+import Prelude hiding (break, iterate)
 
 iterate
     :: a          -- ^ Starting value of iterator
