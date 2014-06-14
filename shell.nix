@@ -1,5 +1,5 @@
 { pkgs ? (import <nixpkgs> {}), haskellPackages ? pkgs.haskellPackages_ghc782
-, hsDevTools ? pkgs.hsDevTools }:
+, hsDevTools ? pkgs.hsDevTools or null }:
 
 let inherit (haskellPackages)
       cabal criterion primitive tasty tastyQuickcheck transformers vector;
@@ -10,7 +10,7 @@ cabal.mkDerivation (self: {
   src = ./.;
   buildDepends = [ primitive transformers vector ];
   testDepends = [ criterion tasty tastyQuickcheck ];
-  buildTools = hsDevTools haskellPackages;
+  buildTools = if hsDevTools == null then [] else hsDevTools haskellPackages;
   hyperlinkSource = true;
   meta = {
     description = "Fast imperative-style loops as a free monad EDSL";
