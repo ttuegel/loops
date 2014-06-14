@@ -93,8 +93,8 @@ cons :: a -> LoopT m a -> LoopT m a
 {-# INLINE cons #-}
 cons a as = LoopT $ \yield next brk -> yield a (runLoopT as yield next brk) next
 
--- | Yield a value for this iteration of the loop and skip immediately to
--- the next iteration.
+-- | Yield a value for this iteration of the loop and continue to the next
+-- iteration.
 --
 -- Same as pure / return.
 continue :: a -> LoopT m a
