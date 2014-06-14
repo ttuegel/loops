@@ -2,9 +2,9 @@
 
 module Control.Monad.Loop.Internal
     ( LoopT(..), Loop, loop
-    , Unroll(..), Unrolling(), noUnroll
     , cons, continue, continue_, break, break_, exec_
     , iterate, forever, for, unfoldl, while
+    , module Data.Unroll
     ) where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)

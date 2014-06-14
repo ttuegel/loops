@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Control.Monad.Loop.ForEach where
+module Control.Monad.Loop.ForEach (ForEach(..)) where
 
 import Control.Monad (liftM)
 import Control.Monad.Primitive (PrimMonad, PrimState)
