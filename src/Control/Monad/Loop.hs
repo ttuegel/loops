@@ -1,7 +1,13 @@
+{-# LANGUAGE CPP #-}
+
 module Control.Monad.Loop
     ( LoopT(..), Loop, loop
     , cons, continue, continue_, break, break_, exec_
+#if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)
+#else
+    , ForEach(), ForEachValue, ForEachIx
+#endif
     , iterate, forever, for, unfoldl, while
     , forEach, iforEach
     ) where
@@ -9,8 +15,12 @@ module Control.Monad.Loop
 import Control.Monad.Loop.Unroll
     ( LoopT(..), Loop, loop
     , cons, continue, continue_, break, break_, exec_
+#if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)
-    , noUnroll
+#else
+    , ForEach(), ForEachValue, ForEachIx
+#endif
+    , unroll1
     )
 import qualified Control.Monad.Loop.Unroll as U
 import Prelude hiding (break, iterate)
@@ -20,11 +30,11 @@ iterate
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
-iterate = U.iterate noUnroll
+iterate = U.iterate unroll1
 
 forever :: LoopT m ()
 {-# INLINE forever #-}
-forever = U.forever noUnroll
+forever = U.forever unroll1
 
 for
     :: a            -- ^ Starting value of iterator
@@ -34,7 +44,7 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE for #-}
-for = U.for noUnroll
+for = U.for unroll1
 
 unfoldl
     :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
@@ -42,21 +52,21 @@ unfoldl
     -> i                    -- ^ Starting value
     -> LoopT m a
 {-# INLINE unfoldl #-}
-unfoldl = U.unfoldl noUnroll
+unfoldl = U.unfoldl unroll1
 
 while
     :: Monad m
     => m Bool
     -> LoopT m ()
 {-# INLINE while #-}
-while = U.while noUnroll
+while = U.while unroll1
 
 -- | Iterate over the values in the container.
 forEach :: ForEach m c => c -> m (ForEachValue c)
 {-# INLINE forEach #-}
-forEach = U.forEach noUnroll
+forEach = U.forEach unroll1
 
 -- | Iterate over the indices and the value at each index.
 iforEach :: ForEach m c => c -> m (ForEachIx c, ForEachValue c)
 {-# INLINE iforEach #-}
-iforEach = U.iforEach noUnroll
+iforEach = U.iforEach unroll1

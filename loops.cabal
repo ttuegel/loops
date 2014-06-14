@@ -32,7 +32,7 @@ category:            Control
 build-type:          Simple
 extra-source-files:  README.md, README.lhs
 cabal-version:       >=1.10
-tested-with:         GHC == 7.8.2
+tested-with:         GHC == 7.6.3, GHC == 7.8.2
 
 source-repository head
   type: git
@@ -40,6 +40,7 @@ source-repository head
 
 library
   exposed-modules:
+    Data.Unroll
     Control.Monad.Loop
     Control.Monad.Loop.Unroll
     Control.Monad.Loop.ForEach

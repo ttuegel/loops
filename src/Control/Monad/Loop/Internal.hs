@@ -1,17 +1,10 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop.Internal
     ( LoopT(..), Loop, loop
-    , Unroll(..), UnTL, Unrolling(), noUnroll
     , cons, continue, continue_, break, break_, exec_
     , iterate, forever, for, unfoldl, while
+    , module Data.Unroll
     ) where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)
@@ -19,12 +12,13 @@ import Control.Category ((<<<), (>>>))
 import Control.Monad (unless)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import qualified GHC.TypeLits as TL
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
 import Data.Traversable (Traversable(..))
 import Prelude hiding (foldr, iterate, break)
+
+import Data.Unroll
 
 -- | @LoopT m a@ represents a loop over a base type @m@ that yields a value
 -- @a@ at each iteration. It can be used as a monad transformer, but there
@@ -125,24 +119,24 @@ exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
-    :: Unrolling (UnTL n)
+    :: Unrolling n
     => Unroll n   -- ^ Unrolling factor
     -> a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
 iterate unroll = \a0 adv -> LoopT $ \yield next _ ->
-    let go a = unrollIterate (fromTypeLit unroll) a adv yield go next
+    let go a = unrollIterate unroll a adv yield go next
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
-forever :: Unrolling (UnTL n) => Unroll n -> LoopT m ()
+forever :: Unrolling n => Unroll n -> LoopT m ()
 {-# INLINE forever #-}
 forever unroll = iterate unroll () id
 
 -- | Standard @for@ loop.
 for
-    :: Unrolling (UnTL n)
+    :: Unrolling n
     => Unroll n     -- ^ Unrolling factor
     -> a            -- ^ Starting value of iterator
     -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
@@ -152,12 +146,12 @@ for
     -> LoopT m a
 {-# INLINE for #-}
 for unroll = \a0 cond adv -> LoopT $ \yield next _ ->
-    let go a = unrollFor (fromTypeLit unroll) a cond adv yield go next
+    let go a = unrollFor unroll a cond adv yield go next
     in if cond a0 then go a0 else next
 
 -- | Unfold a loop from the left.
 unfoldl
-    :: Unrolling (UnTL n)
+    :: Unrolling n
     => Unroll n             -- ^ Unrolling factor
     -> (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
@@ -168,7 +162,7 @@ unfoldl unroll = \unf i0 ->
     fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
 
 while
-    :: (Unrolling (UnTL n), Monad m)
+    :: (Unrolling n, Monad m)
     => Unroll n
     -> m Bool
     -> LoopT m ()
@@ -177,57 +171,3 @@ while unroll = \cond -> do
     forever unroll
     p <- lift cond
     unless p break_
-
--- | Proxy type for GHC's type level literal natural numbers. @n@ is the
--- number of times the loop will be unrolled into its own body.
-data Unroll (n :: TL.Nat) = Unroll
-
-data Nat = S !Nat | Z
-data UnrollInd (n :: Nat) = UnrollInd
-
--- | Do not unroll the loop at all.
-noUnroll :: Unroll 1
-noUnroll = Unroll
-
-predUnroll :: UnrollInd (S n) -> UnrollInd n
-predUnroll UnrollInd = UnrollInd
-
-type family UnTL (n :: TL.Nat) :: Nat where
-    UnTL 1 = S Z
-    UnTL n = S (UnTL ((TL.-) n 1))
-
-fromTypeLit :: Unroll n -> UnrollInd (UnTL n)
-fromTypeLit Unroll = UnrollInd
-
-class Unrolling (n :: Nat) where
-    unrollFor
-        :: UnrollInd n
-        -> a -> (a -> Bool) -> (a -> a)  -- for parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
-
-    unrollIterate
-        :: UnrollInd n  -- unrolling factor
-        -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
-
-instance Unrolling Z where
-    {-# INLINE unrollFor #-}
-    unrollFor UnrollInd a _ _ _ next _ = next a
-
-    {-# INLINE unrollIterate #-}
-    unrollIterate UnrollInd a _ _ next _ = next a
-
-instance Unrolling n => Unrolling (S n) where
-    {-# INLINE unrollFor #-}
-    unrollFor unroll a cond adv yield next brk =
-        yield a descend brk
-      where
-        a' = adv a
-        descend | cond a' = unrollFor (predUnroll unroll) a' cond adv yield next brk
-                | otherwise = brk
-
-    {-# INLINE unrollIterate #-}
-    unrollIterate unroll a adv yield next brk =
-        yield a descend brk
-      where
-        descend = unrollIterate (predUnroll unroll) (adv a) adv yield next brk
