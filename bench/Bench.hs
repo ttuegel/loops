@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Main where
 
@@ -47,7 +46,7 @@ main = defaultMain
     {-# INLINE unroll8 #-}
     unroll8 = Unroll
 
-bench_sum_foldl_LoopT :: Unrolling (UnLit n) => Unroll n -> Int -> Int
+bench_sum_foldl_LoopT :: Unrolling n => Unroll n -> Int -> Int
 {-# INLINE bench_sum_foldl_LoopT #-}
 bench_sum_foldl_LoopT unroll = \n -> foldl' (+) 0 $ loop $ for unroll 0 (<= n) (+ 1)
 
@@ -64,6 +63,6 @@ bench_sum_foldr_Vector :: Int -> Int
 bench_sum_foldr_Vector n =
     V.foldr (+) 0 $ V.enumFromTo 0 n
 
-bench_sum_foldr_LoopT :: Unrolling (UnLit n) => Unroll n -> Int -> Int
+bench_sum_foldr_LoopT :: Unrolling n => Unroll n -> Int -> Int
 {-# INLINE bench_sum_foldr_LoopT #-}
 bench_sum_foldr_LoopT unroll = \n -> foldr (+) 0 $ loop $ for unroll 0 (<= n) (+ 1)

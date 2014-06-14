@@ -1,10 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.Loop.Internal
     ( LoopT(..), Loop, loop
-    , Unroll(..), UnTL, Unrolling(), noUnroll
+    , Unroll(..), Unrolling(), noUnroll
     , cons, continue, continue_, break, break_, exec_
     , iterate, forever, for, unfoldl, while
     ) where
@@ -121,24 +119,24 @@ exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
-    :: Unrolling (UnLit n)
+    :: Unrolling n
     => Unroll n   -- ^ Unrolling factor
     -> a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopT m a
 {-# INLINE iterate #-}
 iterate unroll = \a0 adv -> LoopT $ \yield next _ ->
-    let go a = unrollIterate (unlit unroll) a adv yield go next
+    let go a = unrollIterate unroll a adv yield go next
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
-forever :: Unrolling (UnLit n) => Unroll n -> LoopT m ()
+forever :: Unrolling n => Unroll n -> LoopT m ()
 {-# INLINE forever #-}
 forever unroll = iterate unroll () id
 
 -- | Standard @for@ loop.
 for
-    :: Unrolling (UnLit n)
+    :: Unrolling n
     => Unroll n     -- ^ Unrolling factor
     -> a            -- ^ Starting value of iterator
     -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
@@ -148,12 +146,12 @@ for
     -> LoopT m a
 {-# INLINE for #-}
 for unroll = \a0 cond adv -> LoopT $ \yield next _ ->
-    let go a = unrollFor (unlit unroll) a cond adv yield go next
+    let go a = unrollFor unroll a cond adv yield go next
     in if cond a0 then go a0 else next
 
 -- | Unfold a loop from the left.
 unfoldl
-    :: Unrolling (UnLit n)
+    :: Unrolling n
     => Unroll n             -- ^ Unrolling factor
     -> (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
@@ -164,7 +162,7 @@ unfoldl unroll = \unf i0 ->
     fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
 
 while
-    :: (Unrolling (UnLit n), Monad m)
+    :: (Unrolling n, Monad m)
     => Unroll n
     -> m Bool
     -> LoopT m ()
