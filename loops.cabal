@@ -40,6 +40,7 @@ source-repository head
 
 library
   exposed-modules:
+    Data.Unroll
     Control.Monad.Loop
     Control.Monad.Loop.Unroll
     Control.Monad.Loop.ForEach
