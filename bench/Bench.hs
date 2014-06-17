@@ -21,6 +21,7 @@ main = defaultMain
             - beyond a few unrollings.
             -}
             [ bench "[]" $ nf bench_sum_foldl_List iters
+            , bench "Manual" $ nf bench_sum_manual iters
             , bench "Vector" $ nf bench_sum_foldl_Vector iters
             , bench "Loop 1" $ nf (bench_sum_foldl_LoopT unroll1) iters
             , bench "Loop 2" $ nf (bench_sum_foldl_LoopT unroll2) iters
@@ -70,3 +71,9 @@ bench_sum_foldr_Vector n =
 bench_sum_foldr_LoopT :: Unrolling n => Unroll n -> Int -> Int
 {-# INLINE bench_sum_foldr_LoopT #-}
 bench_sum_foldr_LoopT unroll = \n -> foldr (+) 0 $ loop $ for unroll 0 (<= n) (+ 1)
+
+bench_sum_manual :: Int -> Int
+bench_sum_manual n = go 0 0
+  where
+    go acc i | i <= n = go (acc + i) (i + 1)
+             | otherwise = acc
