@@ -169,6 +169,7 @@ continue_ = buildLoopLike $ \_ next -> next
 -- quantification of @r@ prevents the continuation from escaping the
 -- child's scope.
 breaking :: (forall r. (a -> LoopLike r m b) -> LoopLike r m a) -> LoopT m a
+{-# INLINE breaking #-}
 breaking child = loopT $ buildLoopLike $ \yield brk ->
     let breaker a = buildLoopLike $ \_ _ -> yield a brk
     in runLoopLike (child breaker) yield brk
@@ -178,6 +179,7 @@ breaking child = loopT $ buildLoopLike $ \yield brk ->
 -- the call to @breaking_@. The quantification of @r@ prevents the
 -- continuation from escaping the child's scope.
 breaking_ :: (forall r. LoopLike r m b -> LoopLike r m a) -> (forall s. LoopLike s m a)
+{-# INLINE breaking_ #-}
 breaking_ child = buildLoopLike $ \yield brk ->
     let breaker = buildLoopLike $ \_ _ -> brk
     in runLoopLike (child breaker) yield brk
@@ -187,6 +189,7 @@ breaking_ child = buildLoopLike $ \yield brk ->
 -- 'breaking' or 'breaking_' outside of @unbreakable@ cannot be used
 -- inside.
 unbreakable :: (forall r. LoopLike r m a) -> (forall s. LoopLike s m a)
+{-# INLINE unbreakable #-}
 unbreakable ll = ll
 
 -- | Execute a loop, sequencing the effects and discarding the values.
