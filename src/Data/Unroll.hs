@@ -31,16 +31,16 @@ class IUnrolling (n :: INat) where
 
     iUnrollIterate
         :: IUnroll n  -- unrolling factor
-        -> a -> (a -> a)  -- iterate parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> a)  -- iterate parameters
+        -> (a -> (a -> m r) -> a -> m r) -> (a -> m r)
+        -> m r -> a -> m r  -- un-newtyped LoopT
 
 instance IUnrolling Z where
     {-# INLINE iUnrollFor #-}
     iUnrollFor IUnroll a _ _ _ next _ = next a
 
     {-# INLINE iUnrollIterate #-}
-    iUnrollIterate IUnroll a _ _ next _ = next a
+    iUnrollIterate IUnroll _ _ next _ = next
 
 instance IUnrolling n => IUnrolling (S n) where
     {-# INLINE iUnrollFor #-}
@@ -52,10 +52,10 @@ instance IUnrolling n => IUnrolling (S n) where
                 | otherwise = brk
 
     {-# INLINE iUnrollIterate #-}
-    iUnrollIterate unroll a adv yield next brk =
-        yield a descend
+    iUnrollIterate unroll adv yield next brk a =
+        yield a descend $ adv a
       where
-        descend = iUnrollIterate (predUnroll unroll) (adv a) adv yield next brk
+        descend = iUnrollIterate (predUnroll unroll) adv yield next brk
 
 -- Unrolling using type level literals
 -- Just a clean wrapper around the inductive code above
@@ -121,9 +121,9 @@ class IUnrolling (UnLit n) => Unrolling (n :: INat) where
 
     unrollIterate
         :: Unroll n  -- unrolling factor
-        -> a -> (a -> a)  -- iterate parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> a)  -- iterate parameters
+        -> (a -> (a -> m r) -> a -> m r) -> (a -> m r)
+        -> m r -> a -> m r  -- un-newtyped LoopT
     {-# INLINE unrollIterate #-}
     unrollIterate = iUnrollIterate . unlit
 
