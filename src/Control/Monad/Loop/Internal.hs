@@ -163,19 +163,6 @@ continue_ :: LoopLike r m a
 {-# INLINE continue_ #-}
 continue_ = buildLoopLike $ \_ next -> next
 
--- | Yield a value for this iteration of the loop and skip all the remaining
--- iterations of the immediately-enclosing loop.
-{-
-break :: a -> LoopLike r m a
-{-# INLINE break #-}
-break a = buildLoopLike $ \yield _ brk -> yield a brk brk
-
--- | Skip all the remaining iterations of the immediately-enclosing loop.
-break_ :: LoopLike r m a
-{-# INLINE break_ #-}
-break_ = buildLoopLike $ \_ _ brk -> brk
--}
-
 -- | @breaking@ passes a continuation to its argument (the "child loop")
 -- which takes a final value that the child loop will yield before
 -- breaking. Control resumes after tho call to @breaking@. The
