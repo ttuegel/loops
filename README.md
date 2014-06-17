@@ -17,9 +17,9 @@ a loop with a single iteration over a value `x`.
 * Robust performance because there is no reliance on fusion.
 * Loop-unrolling to arbitrary depth. Unrollable loop combinators are
   provided in `Control.Monad.Loop.Unroll`. (The simple, "rolled" interface is
-  still provided in `Control.Monad.Loop`.) The unrolling depth set at the call
-  site at compile time. My benchmarks show that folding over unrolled loops is
-  up to 25% faster than folding over unboxed vectors!
+  still provided in `Control.Monad.Loop`.) The unrolling depth is set at the
+  call site at compile time. My benchmarks show that folding over unrolled loops
+  is up to 25% faster than folding over unboxed vectors!
 * **NEW!** Arbitrary, named continuations (breakpoints). `breaking` and
   `breaking_` each create a continuation at the current point and pass that
   continuation to a subloop. The named continuation is existentially quantified
