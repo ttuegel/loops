@@ -3,7 +3,7 @@
 module Control.Monad.Loop.Internal
     ( LoopLike(..), buildLoopLike, loopT, loop
     , LoopT(..), Loop, buildLoopT, runLoopT
-    , cons, continue, continue_, break, break_, exec_
+    , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
     , iterate, forever, for, unfoldl, while
     , module Data.Unroll
     ) where
@@ -21,16 +21,17 @@ import Prelude hiding (foldr, iterate, break)
 
 import Data.Unroll
 
+type LoopType r m a = (a -> m r -> m r) -> m r -> m r
+
 -- | @LoopLike r m a@ represents a loop over a base type @m@ yielding
 -- a value @a@ at each iteration and producing a final result @m r@. It can
 -- be used as a monad transformer, but there are actually no restrictions
 -- on the type @m@. If the types @m@ and @r@ are known, the loop can be
 -- executed with @runLoopLike@, but to execute the loop, it is usually wrapped
 -- in a @LoopT@ using 'loopT'.
-newtype LoopLike r m a = LoopLike
-    { runLoopLike :: (a -> m r -> m r -> m r) -> m r -> m r -> m r }
+newtype LoopLike r m a = LoopLike { runLoopLike :: LoopType r m a }
 
-buildLoopLike :: ((a -> m r -> m r -> m r) -> m r -> m r -> m r) -> LoopLike r m a
+buildLoopLike :: LoopType r m a -> LoopLike r m a
 {-# INLINE buildLoopLike #-}
 buildLoopLike = LoopLike
 
@@ -42,19 +43,19 @@ instance Applicative (LoopLike r m) where
     {-# INLINE pure #-}
     pure a = buildLoopLike $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    fs <*> as = buildLoopLike $ \yield next ->
-        runLoopLike fs (\f -> runLoopLike (fmap f as) yield) next
+    fs <*> as = buildLoopLike $ \yield ->
+        runLoopLike fs (\f -> runLoopLike (fmap f as) yield)
 
 instance Monad (LoopLike r m) where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
-    as >>= f = buildLoopLike $ \yield next ->
-        runLoopLike as (\a -> runLoopLike (f a) yield) next
+    as >>= f = buildLoopLike $ \yield ->
+        runLoopLike as (\a -> runLoopLike (f a) yield)
 
 instance MonadTrans (LoopLike r) where
     {-# INLINE lift #-}
-    lift m = buildLoopLike $ \yield next brk -> m >>= \a -> yield a next brk
+    lift m = buildLoopLike $ \yield next -> m >>= \a -> yield a next
 
 instance MonadIO m => MonadIO (LoopLike r m) where
     {-# INLINE liftIO #-}
@@ -88,11 +89,11 @@ loop :: (forall r. LoopLike r Identity a) -> Loop a
 {-# INLINE loop #-}
 loop = loopT
 
-runLoopT :: LoopT m a -> forall r. (a -> m r -> m r -> m r) -> m r -> m r -> m r
+runLoopT :: LoopT m a -> forall r. LoopType r m a
 {-# INLINE runLoopT #-}
 runLoopT (LoopT ll) = runLoopLike ll
 
-buildLoopT :: (forall r. (a -> m r -> m r -> m r) -> m r -> m r -> m r) -> LoopT m a
+buildLoopT :: (forall r. LoopType r m a) -> LoopT m a
 {-# INLINE buildLoopT #-}
 buildLoopT f = loopT (LoopLike f)
 
@@ -108,19 +109,19 @@ instance Applicative (LoopT m) where
     {-# INLINE pure #-}
     pure a = buildLoopT $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    fs <*> as = buildLoopT $ \yield next ->
-        runLoopT fs (\f -> runLoopT (fmap f as) yield) next
+    fs <*> as = buildLoopT $ \yield ->
+        runLoopT fs (\f -> runLoopT (fmap f as) yield)
 
 instance Monad (LoopT m) where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
-    as >>= f = buildLoopT $ \yield next ->
-        runLoopT as (\a -> runLoopT (f a) yield) next
+    as >>= f = buildLoopT $ \yield ->
+        runLoopT as (\a -> runLoopT (f a) yield)
 
 instance MonadTrans LoopT where
     {-# INLINE lift #-}
-    lift m = buildLoopT $ \yield next brk -> m >>= \a -> yield a next brk
+    lift m = buildLoopT $ \yield next -> m >>= \a -> yield a next
 
 instance MonadIO m => MonadIO (LoopT m) where
     {-# INLINE liftIO #-}
@@ -130,15 +131,15 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     {-# INLINE foldr #-}
     foldr f r xs = foldr (<<<) id inner r
       where
-        yield a next _ = (f a <<<) <$> next
-        inner = runLoopT xs yield (pure id) (pure id)
+        yield a next = (f a <<<) <$> next
+        inner = runLoopT xs yield (pure id)
 
     {-# INLINE foldl' #-}
     foldl' f r xs = foldl' (!>>>) id inner r
       where
         (!>>>) h g = h >>> (g $!)
-        yield a next _ = (flip f a >>>) <$> next
-        inner = runLoopT xs yield (pure id) (pure id)
+        yield a next = (flip f a >>>) <$> next
+        inner = runLoopT xs yield (pure id)
 
 instance (Applicative m, Foldable m) => Traversable (LoopT m) where
     {-# INLINE sequenceA #-}
@@ -146,7 +147,7 @@ instance (Applicative m, Foldable m) => Traversable (LoopT m) where
 
 cons :: a -> LoopLike r m a -> LoopLike r m a
 {-# INLINE cons #-}
-cons a as = buildLoopLike $ \yield next brk -> yield a (runLoopLike as yield next brk) next
+cons a as = buildLoopLike $ \yield -> yield a . runLoopLike as yield
 
 -- | Yield a value for this iteration of the loop and continue to the next
 -- iteration.
@@ -154,16 +155,17 @@ cons a as = buildLoopLike $ \yield next brk -> yield a (runLoopLike as yield nex
 -- Same as pure / return.
 continue :: a -> LoopLike r m a
 {-# INLINE continue #-}
-continue a = buildLoopLike $ \yield next -> yield a next
+continue = return
 
 -- | Skip immediately to the next iteration of the loop without yielding
 -- a value.
 continue_ :: LoopLike r m a
 {-# INLINE continue_ #-}
-continue_ = buildLoopLike $ \_ next _ -> next
+continue_ = buildLoopLike $ \_ next -> next
 
 -- | Yield a value for this iteration of the loop and skip all the remaining
 -- iterations of the immediately-enclosing loop.
+{-
 break :: a -> LoopLike r m a
 {-# INLINE break #-}
 break a = buildLoopLike $ \yield _ brk -> yield a brk brk
@@ -172,11 +174,38 @@ break a = buildLoopLike $ \yield _ brk -> yield a brk brk
 break_ :: LoopLike r m a
 {-# INLINE break_ #-}
 break_ = buildLoopLike $ \_ _ brk -> brk
+-}
+
+-- | @breaking@ passes a continuation to its argument (the "child loop")
+-- which takes a final value that the child loop will yield before
+-- breaking. Control resumes after tho call to @breaking@. The
+-- quantification of @r@ prevents the continuation from escaping the
+-- child's scope.
+breaking :: (forall r. (a -> LoopLike r m b) -> LoopLike r m a) -> LoopT m a
+breaking child = loopT $ buildLoopLike $ \yield brk ->
+    let breaker a = buildLoopLike $ \_ _ -> yield a brk
+    in runLoopLike (child breaker) yield brk
+
+-- | @breaking_@ passes a continuation to its argument (the "child loop")
+-- which breaks all the way out of the child loop. Control resumes after
+-- the call to @breaking_@. The quantification of @r@ prevents the
+-- continuation from escaping the child's scope.
+breaking_ :: (forall r. LoopLike r m b -> LoopLike r m a) -> (forall s. LoopLike s m a)
+breaking_ child = buildLoopLike $ \yield brk ->
+    let breaker = buildLoopLike $ \_ _ -> brk
+    in runLoopLike (child breaker) yield brk
+
+-- | @unbreakable@ prevents unification of existentially quantified return
+-- types between @LoopLikes@. In other words, a continuation from
+-- 'breaking' or 'breaking_' outside of @unbreakable@ cannot be used
+-- inside.
+unbreakable :: (forall r. LoopLike r m a) -> (forall s. LoopLike s m a)
+unbreakable ll = ll
 
 -- | Execute a loop, sequencing the effects and discarding the values.
 exec_ :: Applicative m => LoopT m a -> m ()
 {-# INLINE exec_ #-}
-exec_ xs = runLoopT xs (\_ next _ -> next) (pure ()) (pure ())
+exec_ xs = runLoopT xs (\_ next -> next) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
@@ -186,7 +215,7 @@ iterate
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE iterate #-}
-iterate unroll = \a0 adv -> buildLoopLike $ \yield next _ ->
+iterate unroll = \a0 adv -> buildLoopLike $ \yield next ->
     let go a = unrollIterate unroll a adv yield go next
     in go a0
 
@@ -206,7 +235,7 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE for #-}
-for unroll = \a0 cond adv -> buildLoopLike $ \yield next _ ->
+for unroll = \a0 cond adv -> buildLoopLike $ \yield next ->
     let go a = unrollFor unroll a cond adv yield go next
     in if cond a0 then go a0 else next
 
@@ -228,7 +257,7 @@ while
     -> m Bool
     -> LoopLike r m ()
 {-# INLINE while #-}
-while unroll = \cond -> do
+while unroll = \cond -> breaking_ $ \break_ -> do
     forever unroll
     p <- lift cond
     unless p break_

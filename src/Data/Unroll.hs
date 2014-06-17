@@ -26,12 +26,12 @@ class IUnrolling (n :: INat) where
     iUnrollFor
         :: IUnroll n
         -> a -> (a -> Bool) -> (a -> a)  -- for parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
 
     iUnrollIterate
         :: IUnroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
 
 instance IUnrolling Z where
     {-# INLINE iUnrollFor #-}
@@ -43,7 +43,7 @@ instance IUnrolling Z where
 instance IUnrolling n => IUnrolling (S n) where
     {-# INLINE iUnrollFor #-}
     iUnrollFor unroll a cond adv yield next brk =
-        yield a descend brk
+        yield a descend
       where
         a' = adv a
         descend | cond a' = iUnrollFor (predUnroll unroll) a' cond adv yield next brk
@@ -51,7 +51,7 @@ instance IUnrolling n => IUnrolling (S n) where
 
     {-# INLINE iUnrollIterate #-}
     iUnrollIterate unroll a adv yield next brk =
-        yield a descend brk
+        yield a descend
       where
         descend = iUnrollIterate (predUnroll unroll) (adv a) adv yield next brk
 
@@ -112,14 +112,14 @@ class IUnrolling (UnLit n) => Unrolling (n :: INat) where
     unrollFor
         :: Unroll n
         -> a -> (a -> Bool) -> (a -> a)  -- for parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
     {-# INLINE unrollFor #-}
     unrollFor = iUnrollFor . unlit
 
     unrollIterate
         :: Unroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
     {-# INLINE unrollIterate #-}
     unrollIterate = iUnrollIterate . unlit
 
