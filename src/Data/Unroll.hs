@@ -26,14 +26,12 @@ class IUnrolling (n :: INat) where
     iUnrollFor
         :: IUnroll n
         -> a -> (a -> Bool) -> (a -> a)  -- for parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
 
     iUnrollIterate
         :: IUnroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
 
 instance IUnrolling Z where
     {-# INLINE iUnrollFor #-}
@@ -114,16 +112,14 @@ class IUnrolling (UnLit n) => Unrolling (n :: INat) where
     unrollFor
         :: Unroll n
         -> a -> (a -> Bool) -> (a -> a)  -- for parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
     {-# INLINE unrollFor #-}
     unrollFor = iUnrollFor . unlit
 
     unrollIterate
         :: Unroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> (s -> m r) -> s -> m r) -> (a -> s -> m r)
-        -> (s -> m r) -> s -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
     {-# INLINE unrollIterate #-}
     unrollIterate = iUnrollIterate . unlit
 
