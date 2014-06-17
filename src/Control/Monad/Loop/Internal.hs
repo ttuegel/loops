@@ -172,9 +172,9 @@ continue_ = buildLoopLike $ \_ next -> next
 -- breaking. Control resumes after tho call to @breaking@. The
 -- quantification of @r@ prevents the continuation from escaping the
 -- child's scope.
-breaking :: (forall r. (a -> LoopLike r m b) -> LoopLike r m a) -> LoopT m a
+breaking :: (forall r. (a -> LoopLike r m b) -> LoopLike r m a) -> (forall s. LoopLike s m a)
 {-# INLINE breaking #-}
-breaking child = loopT $ buildLoopLike $ \yield brk ->
+breaking child = buildLoopLike $ \yield brk ->
     let breaker a = buildLoopLike $ \_ _ -> yield a brk
     in runLoopLike (child breaker) yield brk
 
