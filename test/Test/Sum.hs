@@ -28,11 +28,11 @@ prop_break_order xs =
     foldl' (+) 0 before === foldl' (+) 0 after
   where
     before :: Loop Int
-    before = loop $ do
+    before = loop $ breaking_ $ \break_ -> do
       x <- forEach unroll1 xs
       if x < 10 then continue 10 else break_
     after :: Loop Int
-    after = loop $ do
+    after = loop $ breaking_ $ \break_ -> do
       x <- forEach unroll1 xs
       return ()
       if x < 10 then continue 10 else break_

@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP #-}
 
 module Control.Monad.Loop
-    ( LoopT(..), Loop, loop
-    , cons, continue, continue_, break, break_, exec_
+    ( LoopLike(..), buildLoopLike
+    , LoopT(..), Loop, buildLoopT, loopT, loop, runLoopT
+    , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
 #if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)
 #else
@@ -13,8 +14,9 @@ module Control.Monad.Loop
     ) where
 
 import Control.Monad.Loop.Unroll
-    ( LoopT(..), Loop, loop
-    , cons, continue, continue_, break, break_, exec_
+    ( LoopLike(..), buildLoopLike
+    , LoopT(..), Loop, buildLoopT, loopT, loop, runLoopT
+    , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
 #if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)
 #else
@@ -28,11 +30,11 @@ import Prelude hiding (break, iterate)
 iterate
     :: a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
-    -> LoopT m a
+    -> LoopLike r m a
 {-# INLINE iterate #-}
 iterate = U.iterate unroll1
 
-forever :: LoopT m ()
+forever :: LoopLike r m ()
 {-# INLINE forever #-}
 forever = U.forever unroll1
 
@@ -42,7 +44,7 @@ for
                     -- first time this is false. The termination condition
                     -- is checked at the /start/ of each iteration.
     -> (a -> a)     -- ^ Advance the iterator
-    -> LoopT m a
+    -> LoopLike r m a
 {-# INLINE for #-}
 for = U.for unroll1
 
@@ -50,14 +52,14 @@ unfoldl
     :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
     -> i                    -- ^ Starting value
-    -> LoopT m a
+    -> LoopLike r m a
 {-# INLINE unfoldl #-}
 unfoldl = U.unfoldl unroll1
 
 while
     :: Monad m
     => m Bool
-    -> LoopT m ()
+    -> LoopLike r m ()
 {-# INLINE while #-}
 while = U.while unroll1
 
