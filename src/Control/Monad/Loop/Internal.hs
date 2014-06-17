@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Control.Monad.Loop.Internal
@@ -139,7 +138,7 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     foldl' f r xs = foldl' (!>>>) id inner r
       where
         (!>>>) h g = h >>> (g $!)
-        yield a next !acc = (flip f a !>>>) <$> next acc
+        yield a next acc = (flip f a >>>) <$> next acc
         inner = runLoopT xs yield (pure id)
 
 instance (Applicative m, Foldable m) => Traversable (LoopT m) where
@@ -203,12 +202,8 @@ iterate
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE iterate #-}
-iterate unroll = \a0 adv -> buildLoopLike $ \yield _ ->
-{-
+iterate unroll = \a0 adv -> buildLoopLike $ \yield next ->
     let go = unrollIterate unroll adv yield go next
-    in go a0
-    -}
-    let go = unrollIterate unroll adv yield go
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
@@ -228,13 +223,8 @@ for
     -> LoopLike r m a
 {-# INLINE for #-}
 for unroll = \a0 cond adv -> buildLoopLike $ \yield next ->
-    let go = unrollFor unroll cond adv yield go next
-    in if cond a0 then go a0 else next
-{-
-for unroll = \a0 cond adv -> breaking_ $ \break_ -> do
-    a <- iterate unroll a0 adv
-    if cond a then return a else break_
--}
+    let go a = unrollFor unroll a cond adv yield go (const next)
+    in if cond a0 then go a0 () else next
 
 -- | Unfold a loop from the left.
 unfoldl
