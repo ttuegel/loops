@@ -2,7 +2,7 @@
 
 module Control.Monad.Loop
     ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, runLoopT
+    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
     , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
 #if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)
@@ -15,7 +15,7 @@ module Control.Monad.Loop
 
 import Control.Monad.Loop.Unroll
     ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, runLoopT
+    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
     , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
 #if __GLASGOW_HASKELL >= 708
     , ForEach(ForEachValue, ForEachIx)

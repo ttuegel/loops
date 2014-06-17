@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Control.Monad.Loop.Internal
-    ( LoopLike(..), buildLoopLike, loopT, loop
+    ( LoopLike(..), buildLoopLike, loopT, loop, unloop
     , LoopT(..), Loop, buildLoopT, runLoopT
     , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
     , iterate, forever, for, unfoldl, while
@@ -80,6 +80,10 @@ type Loop = LoopT Identity
 loopT :: (forall r. LoopLike r m a) -> LoopT m a
 {-# INLINE loopT #-}
 loopT = LoopT
+
+unloop :: LoopT m a -> (forall r. LoopLike r m a)
+{-# INLINE unloop #-}
+unloop (LoopT ll) = ll
 
 -- | @loop@ is 'loopT' where the base type has been restricted as an aid to
 -- type inference. For loops over a base monad, there are usually other
