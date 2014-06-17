@@ -142,7 +142,7 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     foldl' f r xs = foldl' (!>>>) id inner r
       where
         (!>>>) h g = h >>> (g $!)
-        yield a next = (flip f a >>>) <$> next
+        yield a next = (flip f a !>>>) <$> next
         inner = runLoopT xs yield (pure id)
 
 instance (Applicative m, Foldable m) => Traversable (LoopT m) where
@@ -229,9 +229,14 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE for #-}
-for unroll = \a0 cond adv -> buildLoopLike $ \yield next ->
-    let go a = unrollFor unroll a cond adv yield go next
-    in if cond a0 then go a0 else next
+for unroll = \a0 cond adv ->
+    -- For some reason, checking cond a0 twice tricks GHC into behaving,
+    -- even though the generated Core looks the same.
+    if cond a0
+      then breaking_ $ \break_ -> do
+          a <- iterate unroll a0 adv
+          if cond a then return a else break_
+      else continue_
 
 -- | Unfold a loop from the left.
 unfoldl
