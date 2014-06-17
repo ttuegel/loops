@@ -40,10 +40,10 @@ instance (Monad m) => ForEach (LoopLike r m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
-    forEach unroll = \as -> liftM head $ for unroll as (not . null) tail
+    forEach unr = \as -> liftM head $ for unr as (not . null) tail
     {-# INLINE forEach #-}
 
-    iforEach unroll = forEach unroll . zip [0..]
+    iforEach unr = forEach unr . zip [0..]
     {-# INLINE iforEach #-}
 
 instance (Monad m) => ForEach (LoopLike r m) (V.Vector a) where
@@ -80,13 +80,13 @@ instance (Monad m, S.Storable a) => ForEach (LoopLike r m) (S.Vector a) where
 
 forEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopLike r m a
 {-# INLINE forEachVector #-}
-forEachVector unroll = liftM snd . iforEachVector unroll
+forEachVector unr = liftM snd . iforEachVector unr
 
 iforEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopLike r m (Int, a)
 {-# INLINE iforEachVector #-}
-iforEachVector unroll = \v -> do
+iforEachVector unr = \v -> do
     let len = G.length v
-    i <- for unroll 0 (< len) (+ 1)
+    i <- for unr 0 (< len) (+ 1)
     x <- G.unsafeIndexM v i
     return (i, x)
 
@@ -124,13 +124,13 @@ instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopLike r m) 
 
 forEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopLike r m a
 {-# INLINE forEachMVector #-}
-forEachMVector unroll = liftM snd . iforEachMVector unroll
+forEachMVector unr = liftM snd . iforEachMVector unr
 
 iforEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopLike r m (Int, a)
 {-# INLINE iforEachMVector #-}
-iforEachMVector unroll = \v -> do
+iforEachMVector unr = \v -> do
     let len = MG.length v
-    i <- for unroll 0 (< len) (+ 1)
+    i <- for unr 0 (< len) (+ 1)
     x <- lift $ MG.unsafeRead v i
     return (i, x)
 

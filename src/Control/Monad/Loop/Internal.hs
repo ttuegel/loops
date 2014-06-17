@@ -209,14 +209,14 @@ iterate
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE iterate #-}
-iterate unroll = \a0 adv -> buildLoopLike $ \yield _ ->
-    let go a = unrollIterate unroll a adv yield go
+iterate unr = \a0 adv -> buildLoopLike $ \yield _ ->
+    let go a = unroll unr a adv yield go
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
 forever :: Unrolling n => Unroll n -> LoopLike r m ()
 {-# INLINE forever #-}
-forever unroll = iterate unroll () id
+forever unr = iterate unr () id
 
 -- | Standard @for@ loop.
 for
@@ -229,12 +229,12 @@ for
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopLike r m a
 {-# INLINE for #-}
-for unroll = \a0 cond adv ->
+for unr = \a0 cond adv ->
     -- For some reason, checking cond a0 twice tricks GHC into behaving,
     -- even though the generated Core looks the same.
     if cond a0
       then breaking_ $ \break_ -> do
-          a <- iterate unroll a0 adv
+          a <- iterate unr a0 adv
           if cond a then return a else break_
       else continue_
 
@@ -247,8 +247,8 @@ unfoldl
     -> i                    -- ^ Starting value
     -> LoopLike r m a
 {-# INLINE unfoldl #-}
-unfoldl unroll = \unf i0 ->
-    fromJust . fmap snd <$> for unroll (unf i0) isJust (>>= unf . fst)
+unfoldl unr = \unf i0 ->
+    fromJust . fmap snd <$> for unr (unf i0) isJust (>>= unf . fst)
 
 while
     :: (Unrolling n, Monad m)
@@ -256,7 +256,7 @@ while
     -> m Bool
     -> LoopLike r m ()
 {-# INLINE while #-}
-while unroll = \cond -> breaking_ $ \break_ -> do
-    forever unroll
+while unr = \cond -> breaking_ $ \break_ -> do
+    forever unr
     p <- lift cond
     unless p break_

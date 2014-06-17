@@ -37,12 +37,12 @@ main = defaultMain
         - another thunk from being allocated. (Thunk allocation is much
         - more expensive than just a jump.
         -}
-        [ bench "[]" $ nf bench_sum_foldr_List iters
-        , bench "Vector" $ nf bench_sum_foldr_Vector iters
-        , bench "Loop 1" $ nf (bench_sum_foldr_LoopT unroll1) iters
-        , bench "Loop 2" $ nf (bench_sum_foldr_LoopT unroll2) iters
-        , bench "Loop 4" $ nf (bench_sum_foldr_LoopT unroll4) iters
-        , bench "Loop 8" $ nf (bench_sum_foldr_LoopT unroll8) iters
+        [ bench "sumRightList" $ nf sumRightList iters
+        , bench "sumRightVector" $ nf sumRightVector iters
+        , bench "sumRight1" $ nf sumRight1 iters
+        , bench "sumRight2" $ nf sumRight2 iters
+        , bench "sumRight4" $ nf sumRight4 iters
+        , bench "sumRight8" $ nf sumRight8 iters
         ]
     ]
   where
@@ -51,7 +51,7 @@ main = defaultMain
 
 sumLeft :: Unrolling n => Unroll n -> Int -> Int
 {-# INLINE sumLeft #-}
-sumLeft unroll = \n -> foldl' (+) 0 $ loop $ for unroll 0 (<= n) (+ 1)
+sumLeft unr = \n -> foldl' (+) 0 $ loop $ for unr 0 (<= n) (+ 1)
 
 sumLeft1, sumLeft2, sumLeft4, sumLeft8 :: Int -> Int
 sumLeft1 = sumLeft unroll1
@@ -65,16 +65,22 @@ sumLeftList n = foldl' (+) 0 [0..n]
 sumLeftVector :: Int -> Int
 sumLeftVector n = V.foldl' (+) 0 $ V.enumFromTo 0 n
 
-bench_sum_foldr_List :: Int -> Int
-bench_sum_foldr_List n = foldr (+) 0 [0..n]
+sumRightList :: Int -> Int
+sumRightList n = foldr (+) 0 [0..n]
 
-bench_sum_foldr_Vector :: Int -> Int
-bench_sum_foldr_Vector n =
+sumRightVector :: Int -> Int
+sumRightVector n =
     V.foldr (+) 0 $ V.enumFromTo 0 n
 
-bench_sum_foldr_LoopT :: Unrolling n => Unroll n -> Int -> Int
-{-# INLINE bench_sum_foldr_LoopT #-}
-bench_sum_foldr_LoopT unroll = \n -> foldr (+) 0 $ loop $ for unroll 0 (<= n) (+ 1)
+sumRight :: Unrolling n => Unroll n -> Int -> Int
+{-# INLINE sumRight #-}
+sumRight unr = \n -> foldr (+) 0 $ loop $ for unr 0 (<= n) (+ 1)
+
+sumRight1, sumRight2, sumRight4, sumRight8 :: Int -> Int
+sumRight1 = sumRight unroll1
+sumRight2 = sumRight unroll2
+sumRight4 = sumRight unroll4
+sumRight8 = sumRight unroll8
 
 sumManual :: Int -> Int
 sumManual n = go 0 0
