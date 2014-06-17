@@ -31,14 +31,14 @@ class IUnrolling (n :: INat) where
     iUnrollIterate
         :: IUnroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r  -- un-newtyped LoopT
 
 instance IUnrolling Z where
     {-# INLINE iUnrollFor #-}
     iUnrollFor IUnroll = \a _ _ _ next _ -> next a
 
     {-# INLINE iUnrollIterate #-}
-    iUnrollIterate IUnroll = \a _ _ next _ -> next a
+    iUnrollIterate IUnroll = \a _ _ next -> next a
 
 instance IUnrolling n => IUnrolling (S n) where
     {-# INLINE iUnrollFor #-}
@@ -50,8 +50,8 @@ instance IUnrolling n => IUnrolling (S n) where
         in yield a descend
 
     {-# INLINE iUnrollIterate #-}
-    iUnrollIterate unroll = \a adv yield next brk ->
-        let descend = iUnrollIterate (predUnroll unroll) (adv a) adv yield next brk
+    iUnrollIterate unroll = \a adv yield next ->
+        let descend = iUnrollIterate (predUnroll unroll) (adv a) adv yield next
         in yield a descend
 
 -- Unrolling using type level literals
@@ -118,7 +118,7 @@ class IUnrolling (UnLit n) => Unrolling (n :: INat) where
     unrollIterate
         :: Unroll n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r) -> (a -> m r) -> m r -> m r  -- un-newtyped LoopT
+        -> (a -> m r -> m r) -> (a -> m r) -> m r  -- un-newtyped LoopT
     {-# INLINE unrollIterate #-}
     unrollIterate = iUnrollIterate . unlit
 
