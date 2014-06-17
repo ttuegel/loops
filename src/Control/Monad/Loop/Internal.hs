@@ -203,8 +203,8 @@ iterate
     -> LoopLike r m a
 {-# INLINE iterate #-}
 iterate unroll = \a0 adv -> buildLoopLike $ \yield next ->
-    let go = unrollIterate unroll adv yield go next
-    in go a0
+    let go a = unrollIterate unroll a adv yield go (const next)
+    in go a0 ()
 
 -- | Loop forever without yielding (interesting) values.
 forever :: Unrolling n => Unroll n -> LoopLike r m ()
