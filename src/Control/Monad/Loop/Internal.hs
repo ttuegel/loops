@@ -3,7 +3,8 @@
 module Control.Monad.Loop.Internal
     ( LoopLike(..), buildLoopLike, loopT, loop, unloop
     , LoopT(..), Loop, buildLoopT, runLoopT
-    , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
+    , exec, exec_
+    , cons, continue, continue_, breaking, breaking_, unbreakable
     , iterate, forever, for, unfoldl, while
     , module Data.Unroll
     ) where
@@ -200,6 +201,13 @@ unbreakable ll = ll
 exec_ :: Applicative m => LoopT m a -> m ()
 {-# INLINE exec_ #-}
 exec_ xs = runLoopT xs (\_ next -> next) (pure ())
+
+exec :: Applicative m => LoopT m a -> m (Maybe a)
+{-# INLINE exec #-}
+exec xs = runLoopT xs (\a -> fmap (yielding a)) (pure Nothing)
+  where
+    yielding a Nothing = Just a
+    yielding _ x@(Just _) = x
 
 -- | Iterate forever (or until 'break' is used).
 iterate
