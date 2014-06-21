@@ -7,6 +7,7 @@ module Control.Monad.Loop.ForEach (ForEach(..)) where
 import Control.Monad (liftM)
 import Control.Monad.Primitive (PrimMonad, PrimState)
 import Control.Monad.Trans.Class (lift)
+import GHC.TypeLits
 
 -- Import the vector package qualified to write the ForEach instances
 import qualified Data.Vector as V
@@ -37,51 +38,79 @@ class ForEach m c where
     -- | Iterate over the indices and the value at each index.
     iforEach :: c -> m (ForEachIx c, ForEachValue c)
     -- | Iterate over the values in the container.
-    forEachU :: Unrolling n => Static n -> c -> m (ForEachValue c)
+    forEachU :: (KnownNat n, Unrolling n) => Static n -> c -> m (ForEachValue c)
     -- | Iterate over the indices and the value at each index.
-    iforEachU :: Unrolling n => Static n -> c -> m (ForEachIx c, ForEachValue c)
+    iforEachU :: (KnownNat n, Unrolling n) => Static n -> c -> m (ForEachIx c, ForEachValue c)
 
 instance (Monad m) => ForEach (LoopR r m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
-    forEach = \as -> liftM head $ for as (not . null) tail
     {-# INLINE forEach #-}
+    forEach = \as -> liftM head $ for as (not . null) tail
 
-    iforEach = forEach . zip [0..]
     {-# INLINE iforEach #-}
+    iforEach = forEach . zip [0..]
+
+    {-# INLINE forEachU #-}
+    forEachU unr = \as -> do
+        let n = fromEnum $ natVal unr
+            adv (_, bs) = splitAt n bs
+        (bs, rest) <- for (splitAt n as) (not . null . snd) adv
+        if null rest
+          then forEach bs
+          else liftM head $ iterateS unr bs tail
+
+    {-# INLINE iforEachU #-}
+    iforEachU unr = forEachU unr . zip [0..]
 
 instance (Monad m) => ForEach (LoopR r m) (V.Vector a) where
     type ForEachValue (V.Vector a) = a
     type ForEachIx (V.Vector a) = Int
-    forEach = forEachVector
-    iforEach = iforEachVector
     {-# INLINE forEach #-}
+    forEach = forEachVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUVector
 
 instance (Monad m, U.Unbox a) => ForEach (LoopR r m) (U.Vector a) where
     type ForEachValue (U.Vector a) = a
     type ForEachIx (U.Vector a) = Int
-    forEach = forEachVector
-    iforEach = iforEachVector
     {-# INLINE forEach #-}
+    forEach = forEachVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUVector
 
 instance (Monad m, P.Prim a) => ForEach (LoopR r m) (P.Vector a) where
     type ForEachValue (P.Vector a) = a
     type ForEachIx (P.Vector a) = Int
-    forEach = forEachVector
-    iforEach = iforEachVector
     {-# INLINE forEach #-}
+    forEach = forEachVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUVector
 
 instance (Monad m, S.Storable a) => ForEach (LoopR r m) (S.Vector a) where
     type ForEachValue (S.Vector a) = a
     type ForEachIx (S.Vector a) = Int
-    forEach = forEachVector
-    iforEach = iforEachVector
     {-# INLINE forEach #-}
+    forEach = forEachVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUVector
 
 forEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m a
 {-# INLINE forEachVector #-}
@@ -95,37 +124,67 @@ iforEachVector = \v -> do
     x <- G.unsafeIndexM v i
     return (i, x)
 
+forEachUVector :: (G.Vector v a, KnownNat n, Monad m, Unrolling n) => Static n -> v a -> LoopR r m a
+{-# INLINE forEachUVector #-}
+forEachUVector unr = liftM snd . iforEachUVector unr
+
+iforEachUVector :: (G.Vector v a, KnownNat n, Monad m, Unrolling n) => Static n -> v a -> LoopR r m (Int, a)
+{-# INLINE iforEachUVector #-}
+iforEachUVector unr = \v -> do
+    let len = G.length v
+        n = fromEnum $ natVal unr
+    i <- for 0 (< len) (+ n)
+    j <- iterateS unr i (+ 1)
+    x <- G.unsafeIndexM v j
+    return (j, x)
+
 instance (PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MV.MVector s a) where
     type ForEachValue (MV.MVector s a) = a
     type ForEachIx (MV.MVector s a) = Int
-    forEach = forEachMVector
-    iforEach = iforEachMVector
     {-# INLINE forEach #-}
+    forEach = forEachMVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachMVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUMVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUMVector
 
 instance (PrimMonad m, U.Unbox a, PrimState m ~ s) => ForEach (LoopR r m) (MU.MVector s a) where
     type ForEachValue (MU.MVector s a) = a
     type ForEachIx (MU.MVector s a) = Int
-    forEach = forEachMVector
-    iforEach = iforEachMVector
     {-# INLINE forEach #-}
+    forEach = forEachMVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachMVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUMVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUMVector
 
 instance (PrimMonad m, P.Prim a, PrimState m ~ s) => ForEach (LoopR r m) (MP.MVector s a) where
     type ForEachValue (MP.MVector s a) = a
     type ForEachIx (MP.MVector s a) = Int
-    forEach = forEachMVector
-    iforEach = iforEachMVector
     {-# INLINE forEach #-}
+    forEach = forEachMVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachMVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUMVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUMVector
 
 instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MS.MVector s a) where
     type ForEachValue (MS.MVector s a) = a
     type ForEachIx (MS.MVector s a) = Int
-    forEach = forEachMVector
-    iforEach = iforEachMVector
     {-# INLINE forEach #-}
+    forEach = forEachMVector
     {-# INLINE iforEach #-}
+    iforEach = iforEachMVector
+    {-# INLINE forEachU #-}
+    forEachU = forEachUMVector
+    {-# INLINE iforEachU #-}
+    iforEachU = iforEachUMVector
 
 forEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopR r m a
 {-# INLINE forEachMVector #-}
@@ -139,3 +198,16 @@ iforEachMVector = \v -> do
     x <- lift $ MG.unsafeRead v i
     return (i, x)
 
+forEachUMVector :: (MG.MVector v a, KnownNat n, PrimMonad m, Unrolling n) => Static n -> v (PrimState m) a -> LoopR r m a
+{-# INLINE forEachUMVector #-}
+forEachUMVector unr = liftM snd . iforEachUMVector unr
+
+iforEachUMVector :: (MG.MVector v a, KnownNat n, PrimMonad m, Unrolling n) => Static n -> v (PrimState m) a -> LoopR r m (Int, a)
+{-# INLINE iforEachUMVector #-}
+iforEachUMVector unr = \v -> do
+    let len = MG.length v
+        n = fromEnum $ natVal unr
+    i <- for 0 (< len) (+ n)
+    j <- iterateS unr i (+ 1)
+    x <- lift $ MG.unsafeRead v i
+    return (j, x)

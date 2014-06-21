@@ -18,11 +18,11 @@ prop_sum_foldr_LoopT xs =
 
 prop_sum_foldl_LoopT_Unroll :: [Int] -> Property
 prop_sum_foldl_LoopT_Unroll xs =
-    foldl' (+) 0 xs === (foldl' (+) 0 $ loop $ forEach xs)
+    foldl' (+) 0 xs === (foldl' (+) 0 $ loop $ forEachU unroll8 xs)
 
 prop_sum_foldr_LoopT_Unroll :: [Int] -> Property
 prop_sum_foldr_LoopT_Unroll xs =
-    foldr (+) 0 xs === (foldr (+) 0 $ loop $ forEach xs)
+    foldr (+) 0 xs === (foldr (+) 0 $ loop $ forEachU unroll8 xs)
 
 prop_break_order :: [Int] -> Property
 prop_break_order xs =
