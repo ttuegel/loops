@@ -50,8 +50,9 @@ library
     Control.Monad.Loop
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
-    Control.Monad.Loop.Static
     Control.Monad.Loop.Unroll
+  other-modules:
+    Control.Monad.Loop.Static
   build-depends:
     base >=4.6 && <5,
     primitive >=0.5 && <1,

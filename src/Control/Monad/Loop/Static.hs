@@ -3,11 +3,7 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
-module Control.Monad.Loop.Static
-    ( Nat, N1, N2, N4, N8
-    , Static(..), unroll1, unroll2, unroll4, unroll8
-    , Unrolling, iterateS
-    ) where
+module Control.Monad.Loop.Static where
 
 #if __GLASGOW_HASKELL__ >= 708
 import GHC.TypeLits
