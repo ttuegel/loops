@@ -7,7 +7,7 @@ module Control.Monad.Loop.Internal
     , iterate, forever, for, unfoldl, while, numFromN
     ) where
 
-import Control.Applicative (Applicative(..), (<$>), liftA2)
+import Control.Applicative (Alternative(..), Applicative(..), (<$>), liftA2)
 import Control.Category ((<<<), (>>>))
 import Control.Monad (unless)
 import Control.Monad.IO.Class
@@ -42,6 +42,12 @@ instance Applicative (LoopR r m) where
     {-# INLINE (<*>) #-}
     fs <*> as = buildLoopR $ \yield ->
         runLoopR fs (\f -> runLoopR (fmap f as) yield)
+
+instance Alternative (LoopR r m) where
+    {-# INLINE empty #-}
+    empty = buildLoopR $ \_ next -> next
+    {-# INLINE (<|>) #-}
+    (<|>) a b = buildLoopR $ \yield -> runLoopR a yield . runLoopR b yield
 
 instance Monad (LoopR r m) where
     {-# INLINE return #-}
@@ -112,6 +118,12 @@ instance Applicative (LoopT m) where
     {-# INLINE (<*>) #-}
     fs <*> as = buildLoopT $ \yield ->
         runLoopT fs (\f -> runLoopT (fmap f as) yield)
+
+instance Alternative (LoopT m) where
+    {-# INLINE empty #-}
+    empty = buildLoopT $ \_ next -> next
+    {-# INLINE (<|>) #-}
+    (<|>) a b = buildLoopT $ \yield -> runLoopT a yield . runLoopT b yield
 
 instance Monad (LoopT m) where
     {-# INLINE return #-}
