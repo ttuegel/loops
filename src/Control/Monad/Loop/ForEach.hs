@@ -36,7 +36,7 @@ class ForEach m c where
     -- | Iterate over the indices and the value at each index.
     iforEach :: Unrolling n => Unroll n -> c -> m (ForEachIx c, ForEachValue c)
 
-instance (Monad m) => ForEach (LoopLike r m) [a] where
+instance (Monad m) => ForEach (LoopR r m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
@@ -46,7 +46,7 @@ instance (Monad m) => ForEach (LoopLike r m) [a] where
     iforEach unr = forEach unr . zip [0..]
     {-# INLINE iforEach #-}
 
-instance (Monad m) => ForEach (LoopLike r m) (V.Vector a) where
+instance (Monad m) => ForEach (LoopR r m) (V.Vector a) where
     type ForEachValue (V.Vector a) = a
     type ForEachIx (V.Vector a) = Int
     forEach = forEachVector
@@ -54,7 +54,7 @@ instance (Monad m) => ForEach (LoopLike r m) (V.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (Monad m, U.Unbox a) => ForEach (LoopLike r m) (U.Vector a) where
+instance (Monad m, U.Unbox a) => ForEach (LoopR r m) (U.Vector a) where
     type ForEachValue (U.Vector a) = a
     type ForEachIx (U.Vector a) = Int
     forEach = forEachVector
@@ -62,7 +62,7 @@ instance (Monad m, U.Unbox a) => ForEach (LoopLike r m) (U.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (Monad m, P.Prim a) => ForEach (LoopLike r m) (P.Vector a) where
+instance (Monad m, P.Prim a) => ForEach (LoopR r m) (P.Vector a) where
     type ForEachValue (P.Vector a) = a
     type ForEachIx (P.Vector a) = Int
     forEach = forEachVector
@@ -70,7 +70,7 @@ instance (Monad m, P.Prim a) => ForEach (LoopLike r m) (P.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (Monad m, S.Storable a) => ForEach (LoopLike r m) (S.Vector a) where
+instance (Monad m, S.Storable a) => ForEach (LoopR r m) (S.Vector a) where
     type ForEachValue (S.Vector a) = a
     type ForEachIx (S.Vector a) = Int
     forEach = forEachVector
@@ -78,11 +78,11 @@ instance (Monad m, S.Storable a) => ForEach (LoopLike r m) (S.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopLike r m a
+forEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopR r m a
 {-# INLINE forEachVector #-}
 forEachVector unr = liftM snd . iforEachVector unr
 
-iforEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopLike r m (Int, a)
+iforEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopR r m (Int, a)
 {-# INLINE iforEachVector #-}
 iforEachVector unr = \v -> do
     let len = G.length v
@@ -90,7 +90,7 @@ iforEachVector unr = \v -> do
     x <- G.unsafeIndexM v i
     return (i, x)
 
-instance (PrimMonad m, PrimState m ~ s) => ForEach (LoopLike r m) (MV.MVector s a) where
+instance (PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MV.MVector s a) where
     type ForEachValue (MV.MVector s a) = a
     type ForEachIx (MV.MVector s a) = Int
     forEach = forEachMVector
@@ -98,7 +98,7 @@ instance (PrimMonad m, PrimState m ~ s) => ForEach (LoopLike r m) (MV.MVector s 
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (PrimMonad m, U.Unbox a, PrimState m ~ s) => ForEach (LoopLike r m) (MU.MVector s a) where
+instance (PrimMonad m, U.Unbox a, PrimState m ~ s) => ForEach (LoopR r m) (MU.MVector s a) where
     type ForEachValue (MU.MVector s a) = a
     type ForEachIx (MU.MVector s a) = Int
     forEach = forEachMVector
@@ -106,7 +106,7 @@ instance (PrimMonad m, U.Unbox a, PrimState m ~ s) => ForEach (LoopLike r m) (MU
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (PrimMonad m, P.Prim a, PrimState m ~ s) => ForEach (LoopLike r m) (MP.MVector s a) where
+instance (PrimMonad m, P.Prim a, PrimState m ~ s) => ForEach (LoopR r m) (MP.MVector s a) where
     type ForEachValue (MP.MVector s a) = a
     type ForEachIx (MP.MVector s a) = Int
     forEach = forEachMVector
@@ -114,7 +114,7 @@ instance (PrimMonad m, P.Prim a, PrimState m ~ s) => ForEach (LoopLike r m) (MP.
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopLike r m) (MS.MVector s a) where
+instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MS.MVector s a) where
     type ForEachValue (MS.MVector s a) = a
     type ForEachIx (MS.MVector s a) = Int
     forEach = forEachMVector
@@ -122,11 +122,11 @@ instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopLike r m) 
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopLike r m a
+forEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopR r m a
 {-# INLINE forEachMVector #-}
 forEachMVector unr = liftM snd . iforEachMVector unr
 
-iforEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopLike r m (Int, a)
+iforEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopR r m (Int, a)
 {-# INLINE iforEachMVector #-}
 iforEachMVector unr = \v -> do
     let len = MG.length v
