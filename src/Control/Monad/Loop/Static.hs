@@ -63,6 +63,20 @@ type N8 = 4
 data Static (n :: Nat) = Static
 #else
 data Static (n :: INat) = Static
+
+class KnownNat (n :: INat) where
+    natVal :: Static n -> Integer
+
+instance KnownNat Z where
+    {-# INLINE natVal #-}
+    natVal = \Static -> 0
+
+instance KnownNat n => KnownNat (S n) where
+    {-# INLINE natVal #-}
+    natVal = \n -> 1 + natVal (_pred n)
+      where
+        _pred :: Static (S n) -> Static n
+        _pred Static = Static
 #endif
 
 #if __GLASGOW_HASKELL__ >= 708
