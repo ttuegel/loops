@@ -68,12 +68,14 @@ test-suite tests
   main-is:
     Test.hs
   other-modules:
-    Test.Sum
+    Test.List
+    Test.Vector
   build-depends:
     base >=4.6 && <5,
     loops,
     tasty >=0.8 && <1,
-    tasty-quickcheck >=0.8 && <1
+    tasty-quickcheck >=0.8 && <1,
+    vector >=0.10 && <1
   ghc-options: -Wall
   default-language: Haskell2010
 
