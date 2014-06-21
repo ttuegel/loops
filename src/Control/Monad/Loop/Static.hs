@@ -3,40 +3,42 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
-module Data.Unroll
+module Control.Monad.Loop.Static
     ( Nat, N1, N2, N4, N8
-    , Unroll(..), unroll1, unroll2, unroll4, unroll8
-    , Unrolling(..)
+    , Static(..), unroll1, unroll2, unroll4, unroll8
+    , Unrolling, iterateS
     ) where
 
 #if __GLASGOW_HASKELL__ >= 708
 import GHC.TypeLits
 #endif
 
+import Control.Monad.Loop.Internal
+
 -- Unrolling by induction
 -- Can't use GHC's type level literals here, they don't support induction
 
 data INat = S !INat | Z
-data IUnroll (n :: INat) = IUnroll
-
-predUnroll :: IUnroll (S n) -> IUnroll n
-predUnroll IUnroll = IUnroll
+data IStatic (n :: INat) = IStatic
 
 class IUnrolling (n :: INat) where
-    iUnroll
-        :: IUnroll n  -- unrolling factor
+    iIterateS
+        :: IStatic n  -- unrolling factor
         -> a -> (a -> a)  -- iterate parameters
         -> (a -> m r -> m r) -> (a -> m r) -> m r  -- un-newtyped LoopT
 
 instance IUnrolling Z where
-    {-# INLINE iUnroll #-}
-    iUnroll IUnroll = \a _ _ next -> next a
+    {-# INLINE iIterateS #-}
+    iIterateS IStatic = \a _ _ next -> next a
 
 instance IUnrolling n => IUnrolling (S n) where
-    {-# INLINE iUnroll #-}
-    iUnroll unr = \a adv yield next ->
-        let descend = iUnroll (predUnroll unr) (adv a) adv yield next
+    {-# INLINE iIterateS #-}
+    iIterateS unr = \a adv yield next ->
+        let descend = iIterateS (_pred unr) (adv a) adv yield next
         in yield a descend
+      where
+        _pred :: IStatic (S n) -> IStatic n
+        _pred IStatic = IStatic
 
 -- Unrolling using type level literals
 -- Just a clean wrapper around the inductive code above
@@ -58,9 +60,9 @@ type N8 = 4
 -- will be unrolled into its own body. @n@ must be at least @1@, or the
 -- loop would have no body at all!
 #if __GLASGOW_HASKELL__ >= 708
-data Unroll (n :: Nat) = Unroll
+data Static (n :: Nat) = Static
 #else
-data Unroll (n :: INat) = Unroll
+data Static (n :: INat) = Static
 #endif
 
 #if __GLASGOW_HASKELL__ >= 708
@@ -71,32 +73,35 @@ type family UnLit (n :: Nat) :: INat where
 type UnLit (n :: INat) = n
 #endif
 
-unlit :: Unroll n -> IUnroll (UnLit n)
-unlit Unroll = IUnroll
+unlit :: Static n -> IStatic (UnLit n)
+unlit Static = IStatic
 
 -- | Do not unroll the loop at all.
-unroll1 :: Unroll N1
-unroll1 = Unroll
+unroll1 :: Static N1
+unroll1 = Static
 
-unroll2 :: Unroll N2
-unroll2 = Unroll
+unroll2 :: Static N2
+unroll2 = Static
 
-unroll4 :: Unroll N4
-unroll4 = Unroll
+unroll4 :: Static N4
+unroll4 = Static
 
-unroll8 :: Unroll N8
-unroll8 = Unroll
+unroll8 :: Static N8
+unroll8 = Static
 
 #if __GLASGOW_HASKELL__ >= 708
-class IUnrolling (UnLit n) => Unrolling (n :: Nat) where
+class IUnrolling (UnLit n) => Unrolling (n :: Nat)
 #else
-class IUnrolling (UnLit n) => Unrolling (n :: INat) where
+class IUnrolling (UnLit n) => Unrolling (n :: INat)
 #endif
-    unroll
-        :: Unroll n  -- unrolling factor
-        -> a -> (a -> a)  -- iterate parameters
-        -> (a -> m r -> m r) -> (a -> m r) -> m r  -- un-newtyped LoopT
-    {-# INLINE unroll #-}
-    unroll = iUnroll . unlit
+
+iterateS
+    :: Unrolling n
+    => Static n  -- unrolling factor
+    -> a -> (a -> a)  -- iterate parameters
+    -> LoopR r m a -- un-newtyped LoopT
+{-# INLINE iterateS #-}
+iterateS unr = \a0 adv -> buildLoopR $ \yield next ->
+    iIterateS (unlit unr) a0 adv yield (const next)
 
 instance IUnrolling (UnLit n) => Unrolling n

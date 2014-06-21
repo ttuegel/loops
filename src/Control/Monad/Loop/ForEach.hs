@@ -21,6 +21,7 @@ import qualified Data.Vector.Unboxed as U
 import qualified Data.Vector.Unboxed.Mutable as MU
 
 import Control.Monad.Loop.Internal
+import Control.Monad.Loop.Static
 
 -- | Class of containers that can be iterated over. The class is
 -- parameterized over a base monad where the values of the container can be
@@ -32,18 +33,22 @@ class ForEach m c where
     type ForEachValue c
     type ForEachIx c
     -- | Iterate over the values in the container.
-    forEach :: Unrolling n => Unroll n -> c -> m (ForEachValue c)
+    forEach :: c -> m (ForEachValue c)
     -- | Iterate over the indices and the value at each index.
-    iforEach :: Unrolling n => Unroll n -> c -> m (ForEachIx c, ForEachValue c)
+    iforEach :: c -> m (ForEachIx c, ForEachValue c)
+    -- | Iterate over the values in the container.
+    forEachU :: Unrolling n => Static n -> c -> m (ForEachValue c)
+    -- | Iterate over the indices and the value at each index.
+    iforEachU :: Unrolling n => Static n -> c -> m (ForEachIx c, ForEachValue c)
 
 instance (Monad m) => ForEach (LoopR r m) [a] where
     type ForEachValue [a] = a
     type ForEachIx [a] = Int
 
-    forEach unr = \as -> liftM head $ for unr as (not . null) tail
+    forEach = \as -> liftM head $ for as (not . null) tail
     {-# INLINE forEach #-}
 
-    iforEach unr = forEach unr . zip [0..]
+    iforEach = forEach . zip [0..]
     {-# INLINE iforEach #-}
 
 instance (Monad m) => ForEach (LoopR r m) (V.Vector a) where
@@ -78,15 +83,15 @@ instance (Monad m, S.Storable a) => ForEach (LoopR r m) (S.Vector a) where
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopR r m a
+forEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m a
 {-# INLINE forEachVector #-}
-forEachVector unr = liftM snd . iforEachVector unr
+forEachVector = liftM snd . iforEachVector
 
-iforEachVector :: (Monad m, G.Vector v a, Unrolling n) => Unroll n -> v a -> LoopR r m (Int, a)
+iforEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m (Int, a)
 {-# INLINE iforEachVector #-}
-iforEachVector unr = \v -> do
+iforEachVector = \v -> do
     let len = G.length v
-    i <- for unr 0 (< len) (+ 1)
+    i <- for 0 (< len) (+ 1)
     x <- G.unsafeIndexM v i
     return (i, x)
 
@@ -122,15 +127,15 @@ instance (S.Storable a, PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MS
     {-# INLINE forEach #-}
     {-# INLINE iforEach #-}
 
-forEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopR r m a
+forEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopR r m a
 {-# INLINE forEachMVector #-}
-forEachMVector unr = liftM snd . iforEachMVector unr
+forEachMVector = liftM snd . iforEachMVector
 
-iforEachMVector :: (PrimMonad m, MG.MVector v a, Unrolling n) => Unroll n -> v (PrimState m) a -> LoopR r m (Int, a)
+iforEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopR r m (Int, a)
 {-# INLINE iforEachMVector #-}
-iforEachMVector unr = \v -> do
+iforEachMVector = \v -> do
     let len = MG.length v
-    i <- for unr 0 (< len) (+ 1)
+    i <- for 0 (< len) (+ 1)
     x <- lift $ MG.unsafeRead v i
     return (i, x)
 

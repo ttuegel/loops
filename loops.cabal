@@ -47,11 +47,10 @@ source-repository head
 
 library
   exposed-modules:
-    Data.Unroll
     Control.Monad.Loop
-    Control.Monad.Loop.Unroll
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
+    Control.Monad.Loop.Static
   build-depends:
     base >=4.6 && <5,
     primitive >=0.5 && <1,
@@ -83,6 +82,8 @@ benchmark benchs
     bench
   main-is:
     Bench.hs
+  other-modules:
+    Bench.Loop
   build-depends:
     base >=4.6 && <5,
     criterion >=0.8 && <1,

@@ -5,7 +5,6 @@ module Control.Monad.Loop.Internal
     , LoopT(..), Loop, buildLoopT, runLoopT
     , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
     , iterate, forever, for, unfoldl, while
-    , module Data.Unroll
     ) where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)
@@ -18,8 +17,6 @@ import Data.Functor.Identity
 import Data.Maybe (fromJust, isJust)
 import Data.Traversable (Traversable(..))
 import Prelude hiding (foldr, iterate, break)
-
-import Data.Unroll
 
 type LoopType r m a = (a -> m r -> m r) -> m r -> m r
 
@@ -203,60 +200,49 @@ exec_ xs = runLoopT xs (\_ next -> next) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
-    :: Unrolling n
-    => Unroll n   -- ^ Unrolling factor
-    -> a          -- ^ Starting value of iterator
+    :: a          -- ^ Starting value of iterator
     -> (a -> a)   -- ^ Advance the iterator
     -> LoopR r m a
 {-# INLINE iterate #-}
-iterate unr = \a0 adv -> buildLoopR $ \yield _ ->
-    let go a = unroll unr a adv yield go
+iterate = \a0 adv -> buildLoopR $ \yield _ ->
+    let go a = yield a $ go $ adv a
     in go a0
 
 -- | Loop forever without yielding (interesting) values.
-forever :: Unrolling n => Unroll n -> LoopR r m ()
+forever :: LoopR r m ()
 {-# INLINE forever #-}
-forever unr = iterate unr () id
+forever = iterate () id
 
 -- | Standard @for@ loop.
 for
-    :: Unrolling n
-    => Unroll n     -- ^ Unrolling factor
-    -> a            -- ^ Starting value of iterator
+    :: a            -- ^ Starting value of iterator
     -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
                     -- first time this is false. The termination condition
                     -- is checked at the /start/ of each iteration.
     -> (a -> a)     -- ^ Advance the iterator
     -> LoopR r m a
 {-# INLINE for #-}
-for unr = \a0 cond adv ->
-    -- For some reason, checking cond a0 twice tricks GHC into behaving,
-    -- even though the generated Core looks the same.
-    if cond a0
-      then breaking_ $ \break_ -> do
-          a <- iterate unr a0 adv
-          if cond a then return a else break_
-      else continue_
+for = \a0 cond adv -> buildLoopR $ \yield next ->
+    let go a | cond a = yield a $ go $ adv a
+             | otherwise = next
+    in go a0
 
 -- | Unfold a loop from the left.
 unfoldl
-    :: Unrolling n
-    => Unroll n             -- ^ Unrolling factor
-    -> (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
+    :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
                             -- @a@. @Nothing@ terminates the loop.
     -> i                    -- ^ Starting value
     -> LoopR r m a
 {-# INLINE unfoldl #-}
-unfoldl unr = \unf i0 ->
-    fromJust . fmap snd <$> for unr (unf i0) isJust (>>= unf . fst)
+unfoldl = \unf i0 ->
+    fromJust . fmap snd <$> for (unf i0) isJust (>>= unf . fst)
 
 while
-    :: (Unrolling n, Monad m)
-    => Unroll n
-    -> m Bool
+    :: Monad m
+    => m Bool
     -> LoopR r m ()
 {-# INLINE while #-}
-while unr = \cond -> breaking_ $ \break_ -> do
-    forever unr
+while = \cond -> breaking_ $ \break_ -> do
+    forever
     p <- lift cond
     unless p break_
