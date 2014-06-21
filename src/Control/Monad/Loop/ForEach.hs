@@ -23,6 +23,7 @@ import qualified Data.Vector.Unboxed.Mutable as MU
 
 import Control.Monad.Loop.Internal
 import Control.Monad.Loop.Static
+import Control.Monad.Loop.Unroll
 
 -- | Class of containers that can be iterated over. The class is
 -- parameterized over a base monad where the values of the container can be
@@ -56,7 +57,7 @@ instance (Monad m) => ForEach (LoopR r m) [a] where
     forEachU unr = \as -> do
         let n = fromEnum $ natVal unr
             adv (_, bs) = splitAt n bs
-        (bs, rest) <- for (splitAt n as) (not . null . snd) adv
+        (bs, rest) <- for (splitAt n as) (not . null . fst) adv
         if null rest
           then forEach bs
           else liftM head $ iterateS unr bs tail
@@ -120,7 +121,7 @@ iforEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m (Int, a)
 {-# INLINE iforEachVector #-}
 iforEachVector = \v -> do
     let len = G.length v
-    i <- for 0 (< len) (+ 1)
+    i <- numFromN 0 len
     x <- G.unsafeIndexM v i
     return (i, x)
 
@@ -132,11 +133,9 @@ iforEachUVector :: (G.Vector v a, KnownNat n, Monad m, Unrolling n) => Static n 
 {-# INLINE iforEachUVector #-}
 iforEachUVector unr = \v -> do
     let len = G.length v
-        n = fromEnum $ natVal unr
-    i <- for 0 (< len) (+ n)
-    j <- iterateS unr i (+ 1)
-    x <- G.unsafeIndexM v j
-    return (j, x)
+    i <- numFromNU unr 0 len
+    x <- G.unsafeIndexM v i
+    return (i, x)
 
 instance (PrimMonad m, PrimState m ~ s) => ForEach (LoopR r m) (MV.MVector s a) where
     type ForEachValue (MV.MVector s a) = a
@@ -194,7 +193,7 @@ iforEachMVector :: (PrimMonad m, MG.MVector v a) => v (PrimState m) a -> LoopR r
 {-# INLINE iforEachMVector #-}
 iforEachMVector = \v -> do
     let len = MG.length v
-    i <- for 0 (< len) (+ 1)
+    i <- numFromN 0 len
     x <- lift $ MG.unsafeRead v i
     return (i, x)
 
@@ -206,8 +205,6 @@ iforEachUMVector :: (MG.MVector v a, KnownNat n, PrimMonad m, Unrolling n) => St
 {-# INLINE iforEachUMVector #-}
 iforEachUMVector unr = \v -> do
     let len = MG.length v
-        n = fromEnum $ natVal unr
-    i <- for 0 (< len) (+ n)
-    j <- iterateS unr i (+ 1)
+    i <- numFromNU unr 0 len
     x <- lift $ MG.unsafeRead v i
-    return (j, x)
+    return (i, x)

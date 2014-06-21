@@ -51,6 +51,7 @@ library
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
     Control.Monad.Loop.Static
+    Control.Monad.Loop.Unroll
   build-depends:
     base >=4.6 && <5,
     primitive >=0.5 && <1,

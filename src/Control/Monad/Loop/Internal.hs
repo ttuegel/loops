@@ -4,7 +4,7 @@ module Control.Monad.Loop.Internal
     ( LoopR(..), buildLoopR, loopT, loop, unloop
     , LoopT(..), Loop, buildLoopT, runLoopT
     , cons, continue, continue_, breaking, breaking_, unbreakable, exec_
-    , iterate, forever, for, unfoldl, while
+    , iterate, forever, for, unfoldl, while, numFromN
     ) where
 
 import Control.Applicative (Applicative(..), (<$>), liftA2)
@@ -246,3 +246,7 @@ while = \cond -> breaking_ $ \break_ -> do
     forever
     p <- lift cond
     unless p break_
+
+numFromN :: (Num a, Ord a) => a -> a -> LoopR r m a
+{-# INLINE numFromN #-}
+numFromN = \a0 n -> let an = a0 + n in for a0 (< an) (+ 1)
