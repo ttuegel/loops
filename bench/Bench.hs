@@ -4,23 +4,40 @@ import Criterion.Main
 import Data.Foldable
 import qualified Data.Vector.Unboxed as V
 import Prelude hiding (foldr)
+import System.Random (randomIO)
 
+import qualified Bench.ForEach as ForEach
 import qualified Bench.Loop as Loop
 
 main :: IO ()
-main = defaultMain
-    [ bgroup "External"
-        [ bench "sumLeftList" $ nf sumLeftList iters
-        , bench "sumManual" $ nf sumManual iters
-        , bench "sumLeftVector" $ nf sumLeftVector iters
-        , bench "sumRightList" $ nf sumRightList iters
-        , bench "sumRightVector" $ nf sumRightVector iters
+main = do
+    xsList <- mapM (const randomIO) $ replicate 10000000 ()
+    xsVector <- return $! V.fromList xsList
+    defaultMain
+        [ bgroup "External"
+            [ bench "sumLeftList" $ nf sumLeftList iters
+            , bench "sumManual" $ nf sumManual iters
+            , bench "sumLeftVector" $ nf sumLeftVector iters
+            , bench "sumRightList" $ nf sumRightList iters
+            , bench "sumRightVector" $ nf sumRightVector iters
+            ]
+        , bgroup "Loop"
+            [ bench "sumLeft" $ nf Loop.sumLeft iters
+            , bench "sumLeftReturn" $ nf Loop.sumLeftReturn iters
+            , bench "sumRight" $ nf Loop.sumRight iters
+            ]
+        , bgroup "ForEach"
+            [ bench "sumLeftList" $ nf ForEach.sumLeftList xsList
+            , bench "sumLeftListForEach" $ nf ForEach.sumLeftListForEach xsList
+            , bench "sumRightList" $ nf ForEach.sumRightList xsList
+            , bench "sumRightListForEach" $ nf ForEach.sumRightListForEach xsList
+            , bench "sumLeftVector" $ nf ForEach.sumLeftVector xsVector
+            , bench "sumLeftVectorForEach" $ nf ForEach.sumLeftVectorForEach xsVector
+            , bench "sumRightVector" $ nf ForEach.sumRightVector xsVector
+            , bench "sumRightVectorForEach" $ nf ForEach.sumRightVectorForEach xsVector
+            , bench "sumVectorST" $ nf ForEach.sumVectorST xsVector
+            ]
         ]
-    , bgroup "Loop"
-        [ bench "sumLeft" $ nf Loop.sumLeft iters
-        , bench "sumRight" $ nf Loop.sumRight iters
-        ]
-    ]
   where
     iters :: Int
     iters = 10000000

@@ -16,14 +16,18 @@ main = defaultMain $ testGroup "Tests"
   , testGroup "ForEach/List"
       [ QC.testProperty "sumLeft" List.sumLeft
       , QC.testProperty "sumRight" List.sumRight
+      , QC.testProperty "sumST" List.sumST
       , QC.testProperty "sumLeftU" List.sumLeftU
       , QC.testProperty "sumRightU" List.sumRightU
+      , QC.testProperty "sumSTU" List.sumSTU
       ]
   , testGroup "ForEach/Vector"
       [ QC.testProperty "sumLeft" Vector.sumLeft
       , QC.testProperty "sumRight" Vector.sumRight
+      , QC.testProperty "sumST" Vector.sumST
       , QC.testProperty "sumLeftU" Vector.sumLeftU
       , QC.testProperty "sumRightU" Vector.sumRightU
+      , QC.testProperty "sumSTU" Vector.sumSTU
       ]
   ]
 
