@@ -28,6 +28,12 @@ sumLeftVector = V.foldl' (+) 0
 sumLeftVectorForEach :: Vector Int -> Int
 sumLeftVectorForEach xs = foldl' (+) 0 $ loop $ forEach xs
 
+sumLeftVectorForEachU2 :: Vector Int -> Int
+sumLeftVectorForEachU2 xs = foldl' (+) 0 $ loop $ forEachU unroll2 xs
+
+sumLeftVectorForEachU8 :: Vector Int -> Int
+sumLeftVectorForEachU8 xs = foldl' (+) 0 $ loop $ forEachU unroll8 xs
+
 sumRightVector :: Vector Int -> Int
 sumRightVector = V.foldr (+) 0
 

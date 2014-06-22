@@ -33,6 +33,8 @@ main = do
             , bench "sumRightListForEach" $ nf ForEach.sumRightListForEach xsList
             , bench "sumLeftVector" $ nf ForEach.sumLeftVector xsVector
             , bench "sumLeftVectorForEach" $ nf ForEach.sumLeftVectorForEach xsVector
+            , bench "sumLeftVectorForEachU2" $ nf ForEach.sumLeftVectorForEachU2 xsVector
+            , bench "sumLeftVectorForEachU8" $ nf ForEach.sumLeftVectorForEachU8 xsVector
             , bench "sumRightVector" $ nf ForEach.sumRightVector xsVector
             , bench "sumRightVectorForEach" $ nf ForEach.sumRightVectorForEach xsVector
             , bench "sumVectorST" $ nf ForEach.sumVectorST xsVector
