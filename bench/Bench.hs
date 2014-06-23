@@ -14,30 +14,32 @@ main = do
     xsList <- mapM (const randomIO) $ replicate 10000000 ()
     xsVector <- return $! V.fromList xsList
     defaultMain
-        [ bgroup "External"
+        [ {- bgroup "External"
             [ bench "sumLeftList" $ nf sumLeftList iters
             , bench "sumManual" $ nf sumManual iters
             , bench "sumLeftVector" $ nf sumLeftVector iters
             , bench "sumRightList" $ nf sumRightList iters
             , bench "sumRightVector" $ nf sumRightVector iters
             ]
-        , bgroup "Loop"
+        , -} bgroup "Loop"
             [ bench "sumLeft" $ nf Loop.sumLeft iters
             , bench "sumLeftReturn" $ nf Loop.sumLeftReturn iters
-            , bench "sumRight" $ nf Loop.sumRight iters
+            -- , bench "sumRight" $ nf Loop.sumRight iters
             ]
         , bgroup "ForEach"
-            [ bench "sumLeftList" $ nf ForEach.sumLeftList xsList
+            [ {- bench "sumLeftList" $ nf ForEach.sumLeftList xsList
             , bench "sumLeftListForEach" $ nf ForEach.sumLeftListForEach xsList
             , bench "sumRightList" $ nf ForEach.sumRightList xsList
             , bench "sumRightListForEach" $ nf ForEach.sumRightListForEach xsList
-            , bench "sumLeftVector" $ nf ForEach.sumLeftVector xsVector
+            , -} bench "sumLeftVector" $ nf ForEach.sumLeftVector xsVector
             , bench "sumLeftVectorForEach" $ nf ForEach.sumLeftVectorForEach xsVector
             , bench "sumLeftVectorForEachU2" $ nf ForEach.sumLeftVectorForEachU2 xsVector
             , bench "sumLeftVectorForEachU8" $ nf ForEach.sumLeftVectorForEachU8 xsVector
+            {-
             , bench "sumRightVector" $ nf ForEach.sumRightVector xsVector
             , bench "sumRightVectorForEach" $ nf ForEach.sumRightVectorForEach xsVector
             , bench "sumVectorST" $ nf ForEach.sumVectorST xsVector
+            -}
             ]
         ]
   where
