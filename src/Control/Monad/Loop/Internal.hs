@@ -34,31 +34,31 @@ buildLoopR = LoopR
 
 instance Functor (LoopR r m) where
     {-# INLINE fmap #-}
-    fmap f xs = buildLoopR $ \yield -> runLoopR xs (yield . f)
+    fmap = \f xs -> buildLoopR $ \yield -> runLoopR xs (yield . f)
 
 instance Applicative (LoopR r m) where
     {-# INLINE pure #-}
-    pure a = buildLoopR $ \yield -> yield a
+    pure = \a -> buildLoopR $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    fs <*> as = buildLoopR $ \yield ->
+    (<*>) = \fs as -> buildLoopR $ \yield ->
         runLoopR fs (\f -> runLoopR (fmap f as) yield)
 
 instance Alternative (LoopR r m) where
     {-# INLINE empty #-}
     empty = buildLoopR $ \_ next -> next
     {-# INLINE (<|>) #-}
-    (<|>) a b = buildLoopR $ \yield -> runLoopR a yield . runLoopR b yield
+    (<|>) = \a b -> buildLoopR $ \yield -> runLoopR a yield . runLoopR b yield
 
 instance Monad (LoopR r m) where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
-    as >>= f = buildLoopR $ \yield ->
+    (>>=) = \as f -> buildLoopR $ \yield ->
         runLoopR as (\a -> runLoopR (f a) yield)
 
 instance MonadTrans (LoopR r) where
     {-# INLINE lift #-}
-    lift m = buildLoopR $ \yield next -> m >>= \a -> yield a next
+    lift = \m -> buildLoopR $ \yield next -> m >>= \a -> yield a next
 
 instance MonadIO m => MonadIO (LoopR r m) where
     {-# INLINE liftIO #-}
@@ -110,31 +110,31 @@ liftLoopT f (LoopT ll) = LoopT (f ll)
 
 instance Functor (LoopT m) where
     {-# INLINE fmap #-}
-    fmap f xs = buildLoopT $ \yield -> runLoopT xs (yield . f)
+    fmap = \f xs -> buildLoopT $ \yield -> runLoopT xs (yield . f)
 
 instance Applicative (LoopT m) where
     {-# INLINE pure #-}
-    pure a = buildLoopT $ \yield -> yield a
+    pure = \a -> buildLoopT $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    fs <*> as = buildLoopT $ \yield ->
+    (<*>) = \as -> buildLoopT $ \yield ->
         runLoopT fs (\f -> runLoopT (fmap f as) yield)
 
 instance Alternative (LoopT m) where
     {-# INLINE empty #-}
     empty = buildLoopT $ \_ next -> next
     {-# INLINE (<|>) #-}
-    (<|>) a b = buildLoopT $ \yield -> runLoopT a yield . runLoopT b yield
+    (<|>) = \a b -> buildLoopT $ \yield -> runLoopT a yield . runLoopT b yield
 
 instance Monad (LoopT m) where
     {-# INLINE return #-}
     return = pure
     {-# INLINE (>>=) #-}
-    as >>= f = buildLoopT $ \yield ->
+    (>>=) = \as f -> buildLoopT $ \yield ->
         runLoopT as (\a -> runLoopT (f a) yield)
 
 instance MonadTrans LoopT where
     {-# INLINE lift #-}
-    lift m = buildLoopT $ \yield next -> m >>= \a -> yield a next
+    lift = \m -> buildLoopT $ \yield next -> m >>= \a -> yield a next
 
 instance MonadIO m => MonadIO (LoopT m) where
     {-# INLINE liftIO #-}
@@ -142,13 +142,13 @@ instance MonadIO m => MonadIO (LoopT m) where
 
 instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     {-# INLINE foldr #-}
-    foldr f r xs = foldr (<<<) id inner r
+    foldr = \f r xs -> foldr (<<<) id inner r
       where
         yield = \a next -> (f a <<<) <$> next
         inner = runLoopT xs yield (pure id)
 
     {-# INLINE foldl' #-}
-    foldl' f r xs = foldl' (!>>>) id inner r
+    foldl' = \f r xs -> foldl' (!>>>) id inner r
       where
         (!>>>) = \h g -> h >>> (g $!)
         yield = \a next -> (flip f a !>>>) <$> next
@@ -160,7 +160,7 @@ instance (Applicative m, Foldable m) => Traversable (LoopT m) where
 
 cons :: a -> LoopR r m a -> LoopR r m a
 {-# INLINE cons #-}
-cons a as = buildLoopR $ \yield -> yield a . runLoopR as yield
+cons = \a as -> buildLoopR $ \yield -> yield a . runLoopR as yield
 
 -- | Yield a value for this iteration of the loop and continue to the next
 -- iteration.
@@ -183,7 +183,7 @@ continue_ = buildLoopR $ \_ next -> next
 -- child's scope.
 breaking :: (forall r. (a -> LoopR r m b) -> LoopR r m a) -> (forall s. LoopR s m a)
 {-# INLINE breaking #-}
-breaking child = buildLoopR $ \yield brk ->
+breaking = \child -> buildLoopR $ \yield brk ->
     let breaker a = buildLoopR $ \_ _ -> yield a brk
     in runLoopR (child breaker) yield brk
 
@@ -193,7 +193,7 @@ breaking child = buildLoopR $ \yield brk ->
 -- continuation from escaping the child's scope.
 breaking_ :: (forall r. LoopR r m b -> LoopR r m a) -> (forall s. LoopR s m a)
 {-# INLINE breaking_ #-}
-breaking_ child = buildLoopR $ \yield brk ->
+breaking_ = \child -> buildLoopR $ \yield brk ->
     let breaker = buildLoopR $ \_ _ -> brk
     in runLoopR (child breaker) yield brk
 
@@ -203,12 +203,12 @@ breaking_ child = buildLoopR $ \yield brk ->
 -- inside.
 unbreakable :: (forall r. LoopR r m a) -> (forall s. LoopR s m a)
 {-# INLINE unbreakable #-}
-unbreakable ll = ll
+unbreakable = \ll -> ll
 
 -- | Execute a loop, sequencing the effects and discarding the values.
 exec_ :: Applicative m => LoopT m a -> m ()
 {-# INLINE exec_ #-}
-exec_ xs = runLoopT xs (\_ next -> next) (pure ())
+exec_ = \xs -> runLoopT xs (\_ next -> next) (pure ())
 
 -- | Iterate forever (or until 'break' is used).
 iterate
