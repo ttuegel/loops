@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Control.Monad.Loop.Internal
@@ -8,7 +9,6 @@ module Control.Monad.Loop.Internal
     ) where
 
 import Control.Applicative (Alternative(..), Applicative(..), (<$>), liftA2)
-import Control.Category ((<<<), (>>>))
 import Control.Monad (unless)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -116,7 +116,7 @@ instance Applicative (LoopT m) where
     {-# INLINE pure #-}
     pure = \a -> buildLoopT $ \yield -> yield a
     {-# INLINE (<*>) #-}
-    (<*>) = \as -> buildLoopT $ \yield ->
+    (<*>) = \fs as -> buildLoopT $ \yield ->
         runLoopT fs (\f -> runLoopT (fmap f as) yield)
 
 instance Alternative (LoopT m) where
@@ -142,17 +142,18 @@ instance MonadIO m => MonadIO (LoopT m) where
 
 instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     {-# INLINE foldr #-}
-    foldr = \f r xs -> foldr (<<<) id inner r
-      where
-        yield = \a next -> (f a <<<) <$> next
-        inner = runLoopT xs yield (pure id)
+    foldr = \f r0 xs ->
+        let yield = \a next -> (f a <<<) <$> next
+            inner = runLoopT xs yield (pure id)
+            (<<<) = \g h r -> g $ h r
+        in foldr (<<<) id inner r0
 
     {-# INLINE foldl' #-}
-    foldl' = \f r xs -> foldl' (!>>>) id inner r
-      where
-        (!>>>) = \h g -> h >>> (g $!)
-        yield = \a next -> (flip f a !>>>) <$> next
-        inner = runLoopT xs yield (pure id)
+    foldl' = \ f r0 xs ->
+      let (!>>>) = \ h g !r -> g $! h r
+          yield = \ a next -> ((\ !r -> f r a) !>>>) <$> next
+          inner = runLoopT xs yield (pure id)
+      in foldl' (!>>>) id inner r0
 
 instance (Applicative m, Foldable m) => Traversable (LoopT m) where
     {-# INLINE sequenceA #-}

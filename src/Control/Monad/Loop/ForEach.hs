@@ -115,7 +115,7 @@ instance (Monad m, S.Storable a) => ForEach (LoopR r m) (S.Vector a) where
 
 forEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m a
 {-# INLINE forEachVector #-}
-forEachVector = \v -> numFromN 0 (G.length v) >>= G.unsafeIndexM v
+forEachVector = \v -> numFromN 0 (G.length v) >>= G.basicUnsafeIndexM v
 
 iforEachVector :: (Monad m, G.Vector v a) => v a -> LoopR r m (Int, a)
 {-# INLINE iforEachVector #-}
