@@ -51,6 +51,8 @@ library
     Control.Monad.Loop.ForEach
     Control.Monad.Loop.Internal
     Control.Monad.Loop.Unroll
+    Data.Functor.ContId
+    Data.Functor.UnboxIdentity
   other-modules:
     Control.Monad.Loop.Static
   build-depends:
