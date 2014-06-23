@@ -144,14 +144,14 @@ instance (Applicative m, Foldable m) => Foldable (LoopT m) where
     {-# INLINE foldr #-}
     foldr f r xs = foldr (<<<) id inner r
       where
-        yield a next = (f a <<<) <$> next
+        yield = \a next -> (f a <<<) <$> next
         inner = runLoopT xs yield (pure id)
 
     {-# INLINE foldl' #-}
     foldl' f r xs = foldl' (!>>>) id inner r
       where
-        (!>>>) h g = h >>> (g $!)
-        yield a next = (flip f a !>>>) <$> next
+        (!>>>) = \h g -> h >>> (g $!)
+        yield = \a next -> (flip f a !>>>) <$> next
         inner = runLoopT xs yield (pure id)
 
 instance (Applicative m, Foldable m) => Traversable (LoopT m) where
