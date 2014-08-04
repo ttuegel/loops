@@ -1,76 +1,53 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE Rank2Types #-}
 
-module Control.Monad.Loop
-    ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
-    , exec, exec_
-    , cons, continue, continue_, breaking, breaking_, unbreakable
-#if __GLASGOW_HASKELL >= 708
-    , ForEach(ForEachValue, ForEachIx)
-#else
-    , ForEach(), ForEachValue, ForEachIx
-#endif
-    , iterate, forever, for, unfoldl, while
-    , forEach, iforEach
-    ) where
+module Control.Monad.Loop where
 
-import Control.Monad.Loop.Unroll
-    ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
-    , exec, exec_
-    , cons, continue, continue_, breaking, breaking_, unbreakable
-#if __GLASGOW_HASKELL >= 708
-    , ForEach(ForEachValue, ForEachIx)
-#else
-    , ForEach(), ForEachValue, ForEachIx
-#endif
-    , unroll1
-    )
-import qualified Control.Monad.Loop.Unroll as U
-import Prelude hiding (break, iterate)
+import Control.Applicative (Applicative(pure, (<*>)), (<$>))
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.Trans.Class (MonadTrans(lift))
+import Data.Foldable (Foldable(..))
+import Data.Monoid (Monoid(mempty, mappend))
+import Prelude hiding (foldr)
 
-iterate
-    :: a          -- ^ Starting value of iterator
-    -> (a -> a)   -- ^ Advance the iterator
-    -> LoopLike r m a
-{-# INLINE iterate #-}
-iterate = U.iterate unroll1
+newtype LoopT m a =
+  LoopT { runLoopT :: forall r. (a -> m r -> m r) -> m r -> m r }
 
-forever :: LoopLike r m ()
-{-# INLINE forever #-}
-forever = U.forever unroll1
+instance Functor (LoopT m) where
+  {-# INLINE fmap #-}
+  fmap = \f l -> LoopT $ \yield -> runLoopT l (yield . f)
 
-for
-    :: a            -- ^ Starting value of iterator
-    -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
-                    -- first time this is false. The termination condition
-                    -- is checked at the /start/ of each iteration.
-    -> (a -> a)     -- ^ Advance the iterator
-    -> LoopLike r m a
-{-# INLINE for #-}
-for = U.for unroll1
+instance Applicative (LoopT m) where
+  {-# INLINE pure #-}
+  pure = \x -> LoopT $ \yield -> yield x
 
-unfoldl
-    :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
-                            -- @a@. @Nothing@ terminates the loop.
-    -> i                    -- ^ Starting value
-    -> LoopLike r m a
-{-# INLINE unfoldl #-}
-unfoldl = U.unfoldl unroll1
+  {-# INLINE (<*>) #-}
+  (<*>) = \fs as -> LoopT $ \yield ->
+    runLoopT fs $ \f -> runLoopT as (yield . f)
 
-while
-    :: Monad m
-    => m Bool
-    -> LoopLike r m ()
-{-# INLINE while #-}
-while = U.while unroll1
+instance Monad (LoopT m) where
+  {-# INLINE return #-}
+  return = pure
 
--- | Iterate over the values in the container.
-forEach :: ForEach m c => c -> m (ForEachValue c)
-{-# INLINE forEach #-}
-forEach = U.forEach unroll1
+  {-# INLINE (>>=) #-}
+  (>>=) = \xs f -> LoopT $ \yield -> runLoopT xs $ \x -> runLoopT (f x) yield
 
--- | Iterate over the indices and the value at each index.
-iforEach :: ForEach m c => c -> m (ForEachIx c, ForEachValue c)
-{-# INLINE iforEach #-}
-iforEach = U.iforEach unroll1
+instance Monoid (LoopT m a) where
+  {-# INLINE mempty #-}
+  mempty = LoopT $ \_ next -> next
+
+  {-# INLINE mappend #-}
+  mappend = \xs ys -> LoopT $ \yield next ->
+    runLoopT xs yield $ runLoopT ys yield next
+
+instance MonadTrans LoopT where
+  {-# INLINE lift #-}
+  lift = \inner -> LoopT $ \yield next -> inner >>= \a -> yield a next
+
+instance MonadIO m => MonadIO (LoopT m) where
+  {-# INLINE liftIO #-}
+  liftIO = lift . liftIO
+
+instance (Applicative m, Foldable m) => Foldable (LoopT m) where
+  {-# INLINE foldr #-}
+  foldr f z l = foldr (.) id inner z where
+    inner = runLoopT l (\a next -> (f a .) <$> next) $ pure id
