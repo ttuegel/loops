@@ -1,25 +1,39 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Data.Foldable.For where
 
 import Data.Foldable
 
-data For a = F !a !(a -> Bool) !(a -> a)
+data For a = forall x. F !x !(x -> Bool) !(x -> (# x, a #))
+
+instance Functor For where
+    fmap = \f (F x check next) ->
+        let next' y = let (# !z, a #) = next y in (# z, f a #)
+        in F x check next'
+    {-# INLINE fmap #-}
 
 instance Foldable For where
-    foldr = \f r (F a0 check next) ->
-        let foldr_For_go !a
-              | check a = f a $ foldr_For_go $! next a
+    foldr = \f r (F x0 check next) ->
+        let foldr_For_go !x
+              | check x =
+                  let (# !y, a #) = next x
+                  in f a $ foldr_For_go y
               | otherwise = r
-        in foldr_For_go a0
+        in foldr_For_go x0
     {-# INLINE foldr #-}
 
-    foldl' = \f r0 (F a0 check next) ->
-        let foldl'_For_go !r !a
-              | check a =
-                  let !r' = f r a
-                      !a' = next a
-                  in foldl'_For_go r' a'
+    foldl' = \f r0 (F x0 check next) ->
+        let foldl'_For_go !r !x
+              | check x =
+                  let (# !y, !a #) = next x
+                      !s = f r a
+                  in foldl'_For_go s y
               | otherwise = r
-        in foldl'_For_go r0 a0
+        in foldl'_For_go r0 x0
     {-# INLINE foldl' #-}
+
+for :: a -> (a -> Bool) -> (a -> a) -> For a
+for = \a0 check next -> F a0 check $ \a -> (# next a, a #)
+{-# INLINE for #-}
