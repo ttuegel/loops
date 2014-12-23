@@ -37,3 +37,13 @@ instance Foldable For where
 for :: a -> (a -> Bool) -> (a -> a) -> For a
 for = \a0 check next -> F a0 check $ \a -> (# next a, a #)
 {-# INLINE for #-}
+
+skip :: Int -> For a -> For a
+skip = \n0 (F x0 check next) ->
+    let skip_go !n !x
+          | n > 0 && check x =
+              let (# y, _ #) = next x
+              in skip_go (n - 1) y
+          | otherwise = F x check next
+    in skip_go n0 x0
+{-# INLINE skip #-}
