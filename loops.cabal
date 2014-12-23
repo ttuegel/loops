@@ -47,6 +47,7 @@ source-repository head
 
 library
   exposed-modules:
+    Data.Foldable.For
     Data.Unroll
     Control.Monad.Loop
     Control.Monad.Loop.Unroll
