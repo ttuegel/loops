@@ -1,5 +1,5 @@
 name:                loops
-version:             0.2.0.2
+version:             0.3.0.0
 synopsis:            Fast imperative-style loops
 description:
   @loops@ is a library for fast, imperative-style loops with a clean syntax.
