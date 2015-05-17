@@ -93,31 +93,16 @@ unfold = \step s0 -> Loop $ \ !_ y r0 ->
   in either unfold_loop_left unfold_loop_right y
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
-{-# INLINE [1] for #-}
-for a check next = Loop for_loop
-  where
-    {-# INLINE [0] for_loop #-}
-    for_loop !spec y r =
-      case y of
-        Left yield -> for_loop_left spec yield r
-        Right yield -> for_loop_right spec yield r
-    {-# INLINE [0] for_loop_left #-}
-    for_loop_left !_ yield r =
-      let for_loop_left_go !spec s b
-            | check b = for_loop_left_go spec (yield s b) (next b)
-            | otherwise = s
-      in for_loop_left_go SPEC r a
-    {-# INLINE [0] for_loop_right #-}
-    for_loop_right !_ yield r =
-      let for_loop_right_go !spec b
-            | check b = yield b (for_loop_right_go spec (next b))
-            | otherwise = r
-      in for_loop_right_go SPEC a
+{-# INLINE for #-}
+for = \a check next -> unfold (\s -> if check s then Yield s (next s) else Done) a
 
 enumFromStepN :: Num a => a -> a -> Int -> Loop a
 {-# INLINE enumFromStepN #-}
-enumFromStepN !x !y !n =
-  fst <$> for (x, n) (\(_, m) -> m > 0) (\(w, m) -> (w + y, m - 1))
+enumFromStepN = \ !x !y !n ->
+  let step (w, m)
+        | m > 0 = let v = w + y in Yield v (v, m - 1)
+        | otherwise = Done
+  in unfold step (x, n)
 
 both :: (a -> c) -> (b -> d) -> Either a b -> Either c d
 {-# INLINE both #-}
