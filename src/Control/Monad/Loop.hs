@@ -36,22 +36,22 @@ instance Applicative Loop where
     in either pure_loop_left pure_loop_right y
 
   {-# INLINE (<*>) #-}
-  (<*>) = \fs as -> Loop $ \ !spec y ->
+  (<*>) = \fs as -> Loop $ \ !spec y t ->
     let ap_loop_left = \yieldB r f ->
           runLoop as spec (Left $ \s a -> yieldB s (f a)) r
         ap_loop_right = \yieldB f r ->
           runLoop as spec (Right $ \a s -> yieldB (f a) s) r
-    in runLoop fs spec $ both ap_loop_left ap_loop_right y
+    in runLoop fs spec (both ap_loop_left ap_loop_right y) t
 
 instance Monad Loop where
   {-# INLINE return #-}
   return = pure
 
   {-# INLINE [1] (>>=) #-}
-  (>>=) = \as f -> Loop $ \ !spec y ->
+  (>>=) = \as f -> Loop $ \ !spec y s ->
     let bind_loop_left = \_ r a -> runLoop (f a) spec y r
         bind_loop_right = \_ a r -> runLoop (f a) spec y r
-    in runLoop as spec $ both bind_loop_left bind_loop_right y
+    in runLoop as spec (both bind_loop_left bind_loop_right y) s
 
 instance Foldable Loop where
   {-# INLINE foldr #-}
