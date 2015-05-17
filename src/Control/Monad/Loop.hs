@@ -1,109 +1,75 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE Rank2Types #-}
 
 module Control.Monad.Loop where
 
+import Control.Monad.Trans.Class
 import Data.Foldable
+import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
--- Technically, we could get away with just a right fold because left folds can
--- be expressed as right folds. However, GHC is bad at optimizing the function
--- composition. This way, the important optimization is constructor specialization;
--- GHC is good at that.
-newtype Loop a = Loop { runLoop :: forall r.
-                                   SPEC
-                                -> Either (r -> a -> r) (a -> r -> r)
-                                   -- ^ The fold or iteratee, depending on your preferred
-                                   -- terminology. 'Either' a 'Left'-fold or a 'Right'-fold;
-                                   -- the loop associates accordingly.
-                                -> r
-                                -> r
-                      }
+newtype LoopT m a = LoopT { runLoopT :: forall r. (a -> r -> m r) -> r -> m r }
 
-instance Functor Loop where
+type Loop = LoopT Identity
+
+instance Functor (LoopT m) where
   {-# INLINE fmap #-}
-  fmap = \f as ->
-    let fmap_yield_left = \yield r a -> yield r (f a)
-        fmap_yield_right = \yield a r -> yield (f a) r
-    in Loop $ \ !spec y -> runLoop as spec $ both fmap_yield_left fmap_yield_right y
+  fmap = \f loop -> LoopT $ \yield -> runLoopT loop (\a -> yield (f a))
 
-instance Applicative Loop where
+instance Applicative (LoopT m) where
   {-# INLINE pure #-}
-  pure = \a -> Loop $ \ !_ y r ->
-    let pure_loop_left = \yield -> yield r a
-        pure_loop_right = \yield -> yield a r
-    in either pure_loop_left pure_loop_right y
+  pure = \a -> LoopT $ \yield -> yield a
 
   {-# INLINE (<*>) #-}
-  (<*>) = \fs as -> Loop $ \ !spec y ->
-    let ap_loop_left = \yieldB r f ->
-          runLoop as spec (Left $ \s a -> yieldB s (f a)) r
-        ap_loop_right = \yieldB f r ->
-          runLoop as spec (Right $ \a s -> yieldB (f a) s) r
-    in runLoop fs spec $ both ap_loop_left ap_loop_right y
+  (<*>) = \loopF loopA ->
+    LoopT $ \yieldB -> runLoopT loopF $ \f -> runLoopT (fmap f loopA) yieldB
 
-instance Monad Loop where
+instance Monad (LoopT m) where
   {-# INLINE return #-}
   return = pure
 
-  {-# INLINE [1] (>>=) #-}
-  (>>=) = \as f -> Loop $ \ !spec y ->
-    let bind_loop_left = \_ r a -> runLoop (f a) spec y r
-        bind_loop_right = \_ a r -> runLoop (f a) spec y r
-    in runLoop as spec $ both bind_loop_left bind_loop_right y
+  {-# INLINE (>>=) #-}
+  (>>=) = \loopA kleisliAB ->
+    LoopT $ \yieldB -> runLoopT loopA $ \a -> runLoopT (kleisliAB a) yieldB
 
-instance Foldable Loop where
+instance MonadTrans LoopT where
+  {-# INLINE lift #-}
+  lift = \inner -> LoopT $ \yield r -> inner >>= \a -> yield a r
+
+instance Foldable (LoopT Identity) where
   {-# INLINE foldr #-}
-  foldr f r as = runLoop as SPEC (Right f) r
+  foldr = \f r loopA -> runIdentity $ runLoopT loopA (\a r' -> pure (f a r')) r
 
-  {-# INLINE foldl' #-}
-  foldl' f r as = runLoop as SPEC (Left g) r
-    where g !s a = f s a
-
-empty :: Loop a
+empty :: Applicative f => LoopT f a
 {-# INLINE empty #-}
-empty = Loop (\ !_ _ r -> r)
+empty = LoopT (\_ -> pure)
 
 data Step s a
   = Yield a s
   | Skip s
   | Done
 
-unfold :: (s -> Step s a) -> s -> Loop a
+unfold :: Monad m => (s -> m (Step s a)) -> s -> LoopT m a
 {-# INLINE unfold #-}
-unfold = \step s0 -> Loop $ \ !_ y r0 ->
+unfold = \step s0 -> LoopT $ \yield r0 ->
+  let unfoldT_loop !spec s1 = do
+        st <- step s1
+        case st of
+          Yield a s2 -> yield a =<< unfoldT_loop spec s2
+          Skip s2 -> unfoldT_loop spec s2
+          Done -> pure r0
+  in unfoldT_loop SPEC s0
 
-  let unfold_loop_left = \yield ->
-        let unfold_loop_left_go !spec s1 r =
-              case step s1 of
-                Yield a s2 -> unfold_loop_left_go spec s2 (yield r a)
-                Skip s2 -> unfold_loop_left_go spec s2 r
-                Done -> r
-        in unfold_loop_left_go SPEC s0 r0
-
-      unfold_loop_right = \yield ->
-        let unfold_loop_right_go !spec s1 =
-              case step s1 of
-                Yield a s2 -> yield a (unfold_loop_right_go spec s2)
-                Skip s2 -> unfold_loop_right_go spec s2
-                Done -> r0
-        in unfold_loop_right_go SPEC s0
-
-  in either unfold_loop_left unfold_loop_right y
-
-for :: a -> (a -> Bool) -> (a -> a) -> Loop a
+for :: Monad m => a -> (a -> Bool) -> (a -> a) -> LoopT m a
 {-# INLINE for #-}
-for = \a check next -> unfold (\s -> if check s then Yield s (next s) else Done) a
+for = \a check next -> unfold (\s -> pure $ if check s then Yield s (next s) else Done) a
 
-enumFromStepN :: Num a => a -> a -> Int -> Loop a
+enumFromStepN :: (Monad m, Num a) => a -> a -> Int -> LoopT m a
 {-# INLINE enumFromStepN #-}
 enumFromStepN = \ !x !y !n ->
   let step (w, m)
-        | m > 0 = let v = w + y in Yield v (v, m - 1)
-        | otherwise = Done
+        | m > 0 = let v = w + y in pure $ Yield v (v, m - 1)
+        | otherwise = pure Done
   in unfold step (x, n)
-
-both :: (a -> c) -> (b -> d) -> Either a b -> Either c d
-{-# INLINE both #-}
-both fl fr = either (Left . fl) (Right . fr)
