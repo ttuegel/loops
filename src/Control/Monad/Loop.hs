@@ -12,7 +12,7 @@ instance Functor Loop where
   {-# INLINE fmap #-}
   fmap = fmap_go where
     fmap_go f loopA = Loop fmap_loop where
-      fmap_loop yieldB = runLoop loopA (\a l r -> yieldB (f a) (fmap_go f l) r)
+      fmap_loop yieldB = runLoop loopA (\a l -> yieldB (f a) (fmap_go f l))
 
 instance Applicative Loop where
   {-# INLINE pure #-}
@@ -38,8 +38,8 @@ instance Monad Loop where
 
 instance Foldable Loop where
   {-# INLINE foldr #-}
-  foldr = foldr_go where
-    foldr_go f r as = runLoop as (\a as' g -> g . f a . (\r' -> foldr_go f r' as')) id r
+  foldr = \f r as -> foldr_go f as r where
+    foldr_go f as = runLoop as (\a as' _ -> f a . foldr_go f as') undefined
 
   {-# INLINE foldl' #-}
   foldl' = foldl'_go where
