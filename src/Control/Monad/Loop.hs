@@ -7,54 +7,59 @@ module Control.Monad.Loop where
 import qualified Control.Monad.Trans.State.Lazy as StL
 import qualified Control.Monad.Trans.State.Strict as StS
 import Data.Foldable
+import Data.Vector.Fusion.Util
 
-newtype Loop a = Loop { runLoop :: forall f. Applicative f => (a -> f ()) -> f () }
+newtype Loop a = Loop { runLoop :: forall r. (a -> r -> r) -> r -> r }
 
 instance Functor Loop where
-  {-# INLINE [1] fmap #-}
-  fmap = \f as -> Loop (\yield -> runLoop as (yield . f))
+  {-# INLINE fmap #-}
+  fmap = \f as ->
+    Loop (\yieldB ->
+            let yieldA a r = yieldB (f a) r
+            in runLoop as yieldA)
 
 instance Applicative Loop where
-  {-# INLINE [1] pure #-}
-  pure = \a -> Loop (\yield -> yield a)
+  {-# INLINE pure #-}
+  pure = \a -> Loop (\yield r -> yield a r)
 
-  {-# INLINE [1] (<*>) #-}
-  (<*>) = \fs as -> Loop (\yield -> runLoop fs (\f -> runLoop as (yield . f)))
+  {-# INLINE (<*>) #-}
+  (<*>) = \fs as ->
+    Loop (\yieldB ->
+            let yieldF = \f -> runLoop as (yieldA f)
+                yieldA f = \a -> yieldB (f a)
+            in runLoop fs yieldF)
 
 instance Monad Loop where
-  {-# INLINE [1] return #-}
+  {-# INLINE return #-}
   return = pure
 
-  {-# INLINE [1] (>>=) #-}
-  (>>=) = \as f -> Loop (\yield -> runLoop as (\a -> runLoop (f a) yield))
+  {-# INLINE (>>=) #-}
+  (>>=) = \as f ->
+    Loop (\yieldB ->
+            let yieldA = \a -> runLoop (f a) yieldB
+            in runLoop as yieldA)
 
 instance Foldable Loop where
-  {-# INLINE [1] foldr #-}
-  foldr = \f r as ->
-    let {-# INLINE [0] foldr_go #-}
-        foldr_go a = StL.modify (. f a)
-    in StL.execState (runLoop as foldr_go) id r
+  {-# INLINE foldr #-}
+  foldr = \f r as -> runLoop as f r
 
-  {-# INLINE [1] foldl' #-}
+  {-
+  {-# INLINE foldl' #-}
   foldl' = \f r as ->
-    let {-# INLINE [0] foldl'_go #-}
-        foldl'_go a = do
-          !s <- StS.get
-          let !t = f s a
-          StS.put t
-    in StS.execState (runLoop as foldl'_go) r
+    let yield = \a h !s -> let !t = f s a in h t
+    in runLoop as yield id r
+  -}
 
 empty :: Loop a
 {-# INLINE empty #-}
-empty = Loop (\_ -> pure ())
+empty = Loop (\_ r -> r)
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
-{-# INLINE [1] for #-}
+{-# INLINE for #-}
 for a check next =
   Loop (\yield ->
-          let {-# INLINE [0] for_loop #-}
-              for_loop b | check b = yield b *> for_loop (next b)
-                         | otherwise = pure ()
+          let for_loop b | check b = \r -> yield b $ for_loop (next b) r
+                         | otherwise = \r -> r
           in for_loop a)
 
 enumFromStepN :: Num a => a -> a -> Int -> Loop a
