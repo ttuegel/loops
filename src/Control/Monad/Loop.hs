@@ -5,14 +5,15 @@
 module Control.Monad.Loop where
 
 import Data.Foldable
-
+import GHC.Types (SPEC(..))
 
 -- Technically, we could get away with just a right fold because left folds can
 -- be expressed as right folds. However, GHC is bad at optimizing the function
 -- composition. This way, the important optimization is constructor specialization;
 -- GHC is good at that.
 newtype Loop a = Loop { runLoop :: forall r.
-                                   Either (r -> a -> r) (a -> r -> r)
+                                   SPEC
+                                -> Either (r -> a -> r) (a -> r -> r)
                                    -- ^ The fold or iteratee, depending on your preferred
                                    -- terminology. 'Either' a 'Left'-fold or a 'Right'-fold;
                                    -- the loop associates accordingly.
@@ -25,44 +26,44 @@ instance Functor Loop where
   fmap = \f as ->
     let fmap_yield_left = \yield r a -> yield r (f a)
         fmap_yield_right = \yield a r -> yield (f a) r
-    in Loop $ \y -> runLoop as $ both fmap_yield_left fmap_yield_right y
+    in Loop $ \ !spec y -> runLoop as spec $ both fmap_yield_left fmap_yield_right y
 
 instance Applicative Loop where
   {-# INLINE pure #-}
-  pure = \a -> Loop $ \y r ->
+  pure = \a -> Loop $ \ !_ y r ->
     let pure_loop_left = \yield -> yield r a
         pure_loop_right = \yield -> yield a r
     in either pure_loop_left pure_loop_right y
 
   {-# INLINE (<*>) #-}
-  (<*>) = \fs as -> Loop $ \y ->
+  (<*>) = \fs as -> Loop $ \ !spec y ->
     let ap_loop_left = \yieldB r f ->
-          runLoop as (Left $ \s a -> yieldB s (f a)) r
+          runLoop as spec (Left $ \s a -> yieldB s (f a)) r
         ap_loop_right = \yieldB f r ->
-          runLoop as (Right $ \a s -> yieldB (f a) s) r
-    in runLoop fs $ both ap_loop_left ap_loop_right y
+          runLoop as spec (Right $ \a s -> yieldB (f a) s) r
+    in runLoop fs spec $ both ap_loop_left ap_loop_right y
 
 instance Monad Loop where
   {-# INLINE return #-}
   return = pure
 
   {-# INLINE [1] (>>=) #-}
-  (>>=) = \as f -> Loop $ \y ->
-    let bind_loop_left = \_ r a -> runLoop (f a) y r
-        bind_loop_right = \_ a r -> runLoop (f a) y r
-    in runLoop as $ both bind_loop_left bind_loop_right y
+  (>>=) = \as f -> Loop $ \ !spec y ->
+    let bind_loop_left = \_ r a -> runLoop (f a) spec y r
+        bind_loop_right = \_ a r -> runLoop (f a) spec y r
+    in runLoop as spec $ both bind_loop_left bind_loop_right y
 
 instance Foldable Loop where
   {-# INLINE foldr #-}
-  foldr f r as = runLoop as (Right f) r
+  foldr f r as = runLoop as SPEC (Right f) r
 
   {-# INLINE foldl' #-}
-  foldl' f r as = runLoop as (Left g) r
+  foldl' f r as = runLoop as SPEC (Left g) r
     where g !s a = f s a
 
 empty :: Loop a
 {-# INLINE empty #-}
-empty = Loop (\_ r -> r)
+empty = Loop (\ !_ _ r -> r)
 
 data Step s a
   = Yield a s
@@ -71,23 +72,23 @@ data Step s a
 
 unfold :: (s -> Step s a) -> s -> Loop a
 {-# INLINE unfold #-}
-unfold = \step s0 -> Loop $ \y r0 ->
+unfold = \step s0 -> Loop $ \ !_ y r0 ->
 
   let unfold_loop_left = \yield ->
-        let unfold_loop_left_go s1 r =
+        let unfold_loop_left_go !spec s1 r =
               case step s1 of
-                Yield a s2 -> unfold_loop_left_go s2 (yield r a)
-                Skip s2 -> unfold_loop_left_go s2 r
+                Yield a s2 -> unfold_loop_left_go spec s2 (yield r a)
+                Skip s2 -> unfold_loop_left_go spec s2 r
                 Done -> r
-        in unfold_loop_left_go s0 r0
+        in unfold_loop_left_go SPEC s0 r0
 
       unfold_loop_right = \yield ->
-        let unfold_loop_right_go s1 =
+        let unfold_loop_right_go !spec s1 =
               case step s1 of
-                Yield a s2 -> yield a (unfold_loop_right_go s2)
-                Skip s2 -> unfold_loop_right_go s2
+                Yield a s2 -> yield a (unfold_loop_right_go spec s2)
+                Skip s2 -> unfold_loop_right_go spec s2
                 Done -> r0
-        in unfold_loop_right_go s0
+        in unfold_loop_right_go SPEC s0
 
   in either unfold_loop_left unfold_loop_right y
 
@@ -96,22 +97,22 @@ for :: a -> (a -> Bool) -> (a -> a) -> Loop a
 for a check next = Loop for_loop
   where
     {-# INLINE [0] for_loop #-}
-    for_loop y r =
+    for_loop !spec y r =
       case y of
-        Left yield -> for_loop_left yield r
-        Right yield -> for_loop_right yield r
+        Left yield -> for_loop_left spec yield r
+        Right yield -> for_loop_right spec yield r
     {-# INLINE [0] for_loop_left #-}
-    for_loop_left yield r =
-      let for_loop_left_go s b
-            | check b = for_loop_left_go (yield s b) (next b)
+    for_loop_left !_ yield r =
+      let for_loop_left_go !spec s b
+            | check b = for_loop_left_go spec (yield s b) (next b)
             | otherwise = s
-      in for_loop_left_go r a
+      in for_loop_left_go SPEC r a
     {-# INLINE [0] for_loop_right #-}
-    for_loop_right yield r =
-      let for_loop_right_go b
-            | check b = yield b (for_loop_right_go (next b))
+    for_loop_right !_ yield r =
+      let for_loop_right_go !spec b
+            | check b = yield b (for_loop_right_go spec (next b))
             | otherwise = r
-      in for_loop_right_go a
+      in for_loop_right_go SPEC a
 
 enumFromStepN :: Num a => a -> a -> Int -> Loop a
 {-# INLINE enumFromStepN #-}
