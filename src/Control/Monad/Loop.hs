@@ -1,6 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
 
 module Control.Monad.Loop where
@@ -64,6 +63,33 @@ instance Foldable Loop where
 empty :: Loop a
 {-# INLINE empty #-}
 empty = Loop (\_ r -> r)
+
+data Step s a
+  = Yield a s
+  | Skip s
+  | Done
+
+unfold :: (s -> Step s a) -> s -> Loop a
+{-# INLINE unfold #-}
+unfold = \step s0 -> Loop $ \y r0 ->
+
+  let unfold_loop_left = \yield ->
+        let unfold_loop_left_go s1 r =
+              case step s1 of
+                Yield a s2 -> unfold_loop_left_go s2 (yield r a)
+                Skip s2 -> unfold_loop_left_go s2 r
+                Done -> r
+        in unfold_loop_left_go s0 r0
+
+      unfold_loop_right = \yield ->
+        let unfold_loop_right_go s1 =
+              case step s1 of
+                Yield a s2 -> yield a (unfold_loop_right_go s2)
+                Skip s2 -> unfold_loop_right_go s2
+                Done -> r0
+        in unfold_loop_right_go s0
+
+  in either unfold_loop_left unfold_loop_right y
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
 {-# INLINE [1] for #-}
