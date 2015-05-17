@@ -55,11 +55,10 @@ instance Monad Loop where
 
 instance Foldable Loop where
   {-# INLINE foldr #-}
-  foldr f r as = runLoop as SPEC (Right f) r
+  foldr = \f r as -> runLoop as SPEC (Right f) r
 
   {-# INLINE foldl' #-}
-  foldl' f r as = runLoop as SPEC (Left g) r
-    where g !s a = f s a
+  foldl' = \f r as -> let g = \ !s a -> f s a in runLoop as SPEC (Left g) r
 
 empty :: Loop a
 {-# INLINE empty #-}
@@ -75,7 +74,7 @@ unfold :: (s -> Step s a) -> s -> Loop a
 unfold = \step s0 -> Loop $ \ !_ y r0 ->
 
   let unfold_loop_left = \yield ->
-        let unfold_loop_left_go !spec s1 r =
+        let unfold_loop_left_go = \ !spec s1 r ->
               case step s1 of
                 Yield a s2 -> unfold_loop_left_go spec s2 (yield r a)
                 Skip s2 -> unfold_loop_left_go spec s2 r
@@ -83,7 +82,7 @@ unfold = \step s0 -> Loop $ \ !_ y r0 ->
         in unfold_loop_left_go SPEC s0 r0
 
       unfold_loop_right = \yield ->
-        let unfold_loop_right_go !spec s1 =
+        let unfold_loop_right_go = \ !spec s1 ->
               case step s1 of
                 Yield a s2 -> yield a (unfold_loop_right_go spec s2)
                 Skip s2 -> unfold_loop_right_go spec s2
@@ -99,11 +98,12 @@ for = \a check next -> unfold (\s -> if check s then Yield s (next s) else Done)
 enumFromStepN :: Num a => a -> a -> Int -> Loop a
 {-# INLINE enumFromStepN #-}
 enumFromStepN = \ !x !y !n ->
-  let step (w, m)
-        | m > 0 = let v = w + y in Yield v (v, m - 1)
-        | otherwise = Done
+  let step = \(w, m) ->
+        case m > 0 of
+          True -> let v = w + y in Yield v (v, m - 1)
+          False -> Done
   in unfold step (x, n)
 
 both :: (a -> c) -> (b -> d) -> Either a b -> Either c d
 {-# INLINE both #-}
-both fl fr = either (Left . fl) (Right . fr)
+both = \fl fr -> either (Left . fl) (Right . fr)
