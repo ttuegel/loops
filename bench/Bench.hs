@@ -11,6 +11,6 @@ import qualified Data.Vector.Fusion.Stream as S
 main :: IO ()
 main =
   defaultMain
-  [ bench "Loop" $ nf (\n -> foldl' (+) 0 $ L.for 0 (< n) (+ 1)) (100000 :: Int)
+  [ bench "Loop" $ nf (\n -> foldl' (+) (0 :: Int) $ L.enumFromStepN 0 1 n) (100000 :: Int)
   , bench "Stream" $ nf (\n -> S.foldl' (+) (0 :: Int) $ S.enumFromStepN 0 1 n) (100000 :: Int)
   ]

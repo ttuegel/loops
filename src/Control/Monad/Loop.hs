@@ -53,3 +53,11 @@ for a check next =
           let for_loop b | check b = yield b *> for_loop (next b)
                          | otherwise = pure ()
           in for_loop a)
+
+enumFromStepN :: Num a => a -> a -> Int -> Loop a
+{-# INLINE enumFromStepN #-}
+enumFromStepN !x !y !n =
+  Loop (\yield ->
+          let step w m | m > 0 = yield w *> step (w + y) (m - 1)
+                       | otherwise = pure ()
+          in step x n)
