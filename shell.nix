@@ -1,6 +1,2 @@
-{ pkgs ? (import <nixpkgs> {})
-, haskellPackages ? pkgs.haskellPackages
-, hsDevTools ? pkgs.hsDevTools or null
-}:
-
-haskellPackages.callPackage ./default.nix {}
+with (import <nixpkgs>{}).haskellPackages;
+(callPackage ./default.nix {}).env
