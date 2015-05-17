@@ -47,13 +47,7 @@ source-repository head
 
 library
   exposed-modules:
-    Data.Foldable.For
-    Data.Foldable.For.Vector.Mutable
-    Data.Unroll
     Control.Monad.Loop
-    Control.Monad.Loop.Unroll
-    Control.Monad.Loop.ForEach
-    Control.Monad.Loop.Internal
   build-depends:
       base >=4.6 && <5
     , primitive >=0.5 && <1
@@ -61,35 +55,4 @@ library
     , vector >=0.10 && <1
   ghc-options: -Wall
   hs-source-dirs: src
-  default-language: Haskell2010
-
-test-suite tests
-  type: exitcode-stdio-1.0
-  hs-source-dirs:
-    test
-  main-is:
-    Test.hs
-  other-modules:
-    Test.Sum
-  build-depends:
-    base >=4.6 && <5,
-    loops,
-    tasty >=0.8 && <1,
-    tasty-quickcheck >=0.8 && <1
-  ghc-options: -Wall
-  default-language: Haskell2010
-
-benchmark benchs
-  type: exitcode-stdio-1.0
-  hs-source-dirs:
-    bench
-  main-is:
-    Bench.hs
-  build-depends:
-    base >=4.6 && <5,
-    criterion >=0.8 && <1,
-    loops,
-    transformers >=0.3 && <1,
-    vector >=0.10 && <1
-  ghc-options: -Wall
   default-language: Haskell2010

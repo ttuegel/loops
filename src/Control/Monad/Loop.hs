@@ -1,76 +1,56 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE Rank2Types #-}
 
-module Control.Monad.Loop
-    ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
-    , exec, exec_
-    , cons, continue, continue_, breaking, breaking_, unbreakable
-#if __GLASGOW_HASKELL >= 708
-    , ForEach(ForEachValue, ForEachIx)
-#else
-    , ForEach(), ForEachValue, ForEachIx
-#endif
-    , iterate, forever, for, unfoldl, while
-    , forEach, iforEach
-    ) where
+module Control.Monad.Loop where
 
-import Control.Monad.Loop.Unroll
-    ( LoopLike(..), buildLoopLike
-    , LoopT(..), Loop, buildLoopT, loopT, loop, unloop, runLoopT
-    , exec, exec_
-    , cons, continue, continue_, breaking, breaking_, unbreakable
-#if __GLASGOW_HASKELL >= 708
-    , ForEach(ForEachValue, ForEachIx)
-#else
-    , ForEach(), ForEachValue, ForEachIx
-#endif
-    , unroll1
-    )
-import qualified Control.Monad.Loop.Unroll as U
-import Prelude hiding (break, iterate)
+import Data.Foldable
 
-iterate
-    :: a          -- ^ Starting value of iterator
-    -> (a -> a)   -- ^ Advance the iterator
-    -> LoopLike r m a
-{-# INLINE iterate #-}
-iterate = U.iterate unroll1
+newtype Loop a = Loop { runLoop :: forall r. (a -> Loop a -> r -> r) -> r -> r }
 
-forever :: LoopLike r m ()
-{-# INLINE forever #-}
-forever = U.forever unroll1
+instance Functor Loop where
+  {-# INLINE fmap #-}
+  fmap = fmap_go where
+    fmap_go f loopA = Loop fmap_loop where
+      fmap_loop yieldB = runLoop loopA (\a l r -> yieldB (f a) (fmap_go f l) r)
 
-for
-    :: a            -- ^ Starting value of iterator
-    -> (a -> Bool)  -- ^ Termination condition. The loop will terminate the
-                    -- first time this is false. The termination condition
-                    -- is checked at the /start/ of each iteration.
-    -> (a -> a)     -- ^ Advance the iterator
-    -> LoopLike r m a
-{-# INLINE for #-}
-for = U.for unroll1
+instance Applicative Loop where
+  {-# INLINE pure #-}
+  pure = pure_go where
+    pure_go a = Loop pure_loop where
+      pure_loop yield = yield a empty
 
-unfoldl
-    :: (i -> Maybe (i, a))  -- ^ @Just (i, a)@ advances the loop, yielding an
-                            -- @a@. @Nothing@ terminates the loop.
-    -> i                    -- ^ Starting value
-    -> LoopLike r m a
-{-# INLINE unfoldl #-}
-unfoldl = U.unfoldl unroll1
+  {-# INLINE (<*>) #-}
+  (<*>) = ap_go where
+    ap_go fs as = Loop ap_loop where
+      ap_loop yieldB =
+        runLoop fs $ \f fs' -> runLoop (ap_go fs' as) yieldB . runLoop (fmap f as) yieldB
 
-while
-    :: Monad m
-    => m Bool
-    -> LoopLike r m ()
-{-# INLINE while #-}
-while = U.while unroll1
+instance Monad Loop where
+  {-# INLINE return #-}
+  return = pure
 
--- | Iterate over the values in the container.
-forEach :: ForEach m c => c -> m (ForEachValue c)
-{-# INLINE forEach #-}
-forEach = U.forEach unroll1
+  {-# INLINE (>>=) #-}
+  (>>=) = bind_go where
+    bind_go as f = Loop bind_loop where
+      bind_loop yieldB =
+        runLoop as $ \a as' -> runLoop (bind_go as' f) yieldB . runLoop (f a) yieldB
 
--- | Iterate over the indices and the value at each index.
-iforEach :: ForEach m c => c -> m (ForEachIx c, ForEachValue c)
-{-# INLINE iforEach #-}
-iforEach = U.iforEach unroll1
+instance Foldable Loop where
+  {-# INLINE foldr #-}
+  foldr = foldr_go where
+    foldr_go f r as = runLoop as (\a as' g -> g . f a . (\r' -> foldr_go f r' as')) id r
+
+  {-# INLINE foldl' #-}
+  foldl' = foldl'_go where
+    foldl'_go f !r as = runLoop as foldl'_yield r where
+      foldl'_yield a as' !s = let !s' = f s a in foldl'_go f s' as'
+
+empty :: Loop a
+empty = Loop $ \_ r -> r
+
+for :: a -> (a -> Bool) -> (a -> a) -> Loop a
+for a check next = Loop for_loop
+  where
+    for_loop yield r | check a = yield a (for (next a) check next) r
+                     | otherwise = r
