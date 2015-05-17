@@ -47,10 +47,12 @@ instance Foldable Loop where
       foldl'_yield a as' !s = let !s' = f s a in foldl'_go f s' as'
 
 empty :: Loop a
+{-# INLINE empty #-}
 empty = Loop $ \_ r -> r
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
-for a check next = Loop for_loop
+{-# INLINE for #-}
+for !a check next = Loop for_loop
   where
     for_loop yield r | check a = yield a (for (next a) check next) r
                      | otherwise = r
