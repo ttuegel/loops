@@ -57,7 +57,4 @@ for a check next =
 enumFromStepN :: Num a => a -> a -> Int -> Loop a
 {-# INLINE enumFromStepN #-}
 enumFromStepN !x !y !n =
-  Loop (\yield ->
-          let step w m | m > 0 = yield w *> step (w + y) (m - 1)
-                       | otherwise = pure ()
-          in step x n)
+  fst <$> for (x, n) (\(_, m) -> m > 0) (\(w, m) -> (w + y, m - 1))
