@@ -2,9 +2,8 @@ module Main where
 
 import Criterion.Main
 import Data.Foldable
-import Data.Functor.Identity
 
-import Control.Monad.Loop (Loop, LoopT)
+import Control.Monad.Loop (Loop)
 import qualified Control.Monad.Loop as L
 import Data.Vector.Fusion.Stream (Stream)
 import qualified Data.Vector.Fusion.Stream as S
