@@ -4,55 +4,52 @@
 
 module Control.Monad.Loop where
 
+import qualified Control.Monad.Trans.State.Lazy as StL
+import qualified Control.Monad.Trans.State.Strict as StS
 import Data.Foldable
 
-newtype Loop a = Loop { runLoop :: forall r. (a -> Loop a -> r -> r) -> r -> r }
+newtype Loop a = Loop { runLoop :: forall f. Applicative f => (a -> f ()) -> f () }
 
 instance Functor Loop where
   {-# INLINE fmap #-}
-  fmap = fmap_go where
-    fmap_go f loopA = Loop fmap_loop where
-      fmap_loop yieldB = runLoop loopA (\a l -> yieldB (f a) (fmap_go f l))
+  fmap = \f as -> Loop (\yield -> runLoop as (yield . f))
 
 instance Applicative Loop where
   {-# INLINE pure #-}
-  pure = pure_go where
-    pure_go a = Loop pure_loop where
-      pure_loop yield = yield a empty
+  pure = \a -> Loop (\yield -> yield a)
 
   {-# INLINE (<*>) #-}
-  (<*>) = ap_go where
-    ap_go fs as = Loop ap_loop where
-      ap_loop yieldB =
-        runLoop fs $ \f fs' -> runLoop (ap_go fs' as) yieldB . runLoop (fmap f as) yieldB
+  (<*>) = \fs as -> Loop (\yield -> runLoop fs (\f -> runLoop as (yield . f)))
 
 instance Monad Loop where
   {-# INLINE return #-}
   return = pure
 
   {-# INLINE (>>=) #-}
-  (>>=) = bind_go where
-    bind_go as f = Loop bind_loop where
-      bind_loop yieldB =
-        runLoop as $ \a as' -> runLoop (bind_go as' f) yieldB . runLoop (f a) yieldB
+  (>>=) = \as f -> Loop (\yield -> runLoop as (\a -> runLoop (f a) yield))
 
 instance Foldable Loop where
   {-# INLINE foldr #-}
-  foldr = \f r as -> foldr_go f as r where
-    foldr_go f as = runLoop as (\a as' _ -> f a . foldr_go f as') undefined
+  foldr = \f r as ->
+    let foldr_go a = StL.modify (. f a)
+    in StL.execState (runLoop as foldr_go) id r
 
   {-# INLINE foldl' #-}
-  foldl' = foldl'_go where
-    foldl'_go f !r as = runLoop as foldl'_yield r where
-      foldl'_yield a as' !s = let !s' = f s a in foldl'_go f s' as'
+  foldl' = \f r as ->
+    let foldl'_go a = do
+          !s <- StS.get
+          let !t = f s a
+          StS.put t
+    in StS.execState (runLoop as foldl'_go) r
 
 empty :: Loop a
 {-# INLINE empty #-}
-empty = Loop $ \_ r -> r
+empty = Loop (\_ -> pure ())
 
 for :: a -> (a -> Bool) -> (a -> a) -> Loop a
 {-# INLINE for #-}
-for !a check next = Loop for_loop
-  where
-    for_loop yield r | check a = yield a (for (next a) check next) r
-                     | otherwise = r
+for a check next =
+  Loop (\yield ->
+          let for_loop b | check b = yield b *> for_loop (next b)
+                         | otherwise = pure ()
+          in for_loop a)
