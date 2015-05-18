@@ -16,15 +16,19 @@ type Loop = LoopT Identity
 
 instance Functor (LoopT m) where
   {-# INLINE fmap #-}
-  fmap = \f loop -> LoopT $ \yield -> runLoopT loop (\a -> yield (f a))
+  fmap = \f loop ->
+    LoopT $ \yield r0 ->
+      runLoopT loop (\a r1 -> yield (f a) r1) r0
 
 instance Applicative (LoopT m) where
   {-# INLINE pure #-}
-  pure = \a -> LoopT $ \yield -> yield a
+  pure = \a -> LoopT $ \yield r -> yield a r
 
   {-# INLINE (<*>) #-}
   (<*>) = \loopF loopA ->
-    LoopT $ \yieldB -> runLoopT loopF $ \f -> runLoopT (fmap f loopA) yieldB
+    LoopT $ \yieldB r0 ->
+      let runLoopB = \f r1 -> runLoopT (fmap f loopA) yieldB r1
+      in runLoopT loopF runLoopB r0
 
 instance Monad (LoopT m) where
   {-# INLINE return #-}
@@ -32,7 +36,9 @@ instance Monad (LoopT m) where
 
   {-# INLINE (>>=) #-}
   (>>=) = \loopA kleisliAB ->
-    LoopT $ \yieldB -> runLoopT loopA $ \a -> runLoopT (kleisliAB a) yieldB
+    LoopT $ \yieldB r0 ->
+      let runLoopB = \a r1 -> runLoopT (kleisliAB a) yieldB r1
+      in runLoopT loopA runLoopB r0
 
 instance MonadTrans LoopT where
   {-# INLINE lift #-}
@@ -44,7 +50,7 @@ instance Foldable (LoopT Identity) where
 
 empty :: Applicative f => LoopT f a
 {-# INLINE empty #-}
-empty = LoopT (\_ -> pure)
+empty = LoopT (\_ r -> pure r)
 
 data Step s a
   = Yield a s
