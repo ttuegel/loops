@@ -6,29 +6,33 @@
 module Control.Monad.Loop where
 
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Identity
+import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
-newtype LoopT m a = LoopT { runLoopT :: forall r. (a -> r -> m r) -> r -> m r }
+newtype LoopT m a =
+  LoopT { runLoopT :: forall r t. (MonadTrans t, Monad (t m))
+                   => SPEC -> (a -> r -> t m r) -> r -> t m r }
 
 type Loop = LoopT Identity
 
 instance Functor (LoopT m) where
   {-# INLINE fmap #-}
   fmap = \f loop ->
-    LoopT $ \yield r0 ->
-      runLoopT loop (\a r1 -> yield (f a) r1) r0
+    LoopT $ \ !spec yield r0 ->
+      runLoopT loop spec (\a r1 -> yield (f a) r1) r0
 
 instance Applicative (LoopT m) where
   {-# INLINE pure #-}
-  pure = \a -> LoopT $ \yield r -> yield a r
+  pure = \a -> LoopT $ \ !_ yield r -> yield a r
 
   {-# INLINE (<*>) #-}
   (<*>) = \loopF loopA ->
-    LoopT $ \yieldB r0 ->
-      let runLoopB = \f r1 -> runLoopT (fmap f loopA) yieldB r1
-      in runLoopT loopF runLoopB r0
+    LoopT $ \ !spec yieldB r0 ->
+      let runLoopB = \f r1 -> runLoopT (fmap f loopA) spec yieldB r1
+      in runLoopT loopF spec runLoopB r0
 
 instance Monad (LoopT m) where
   {-# INLINE return #-}
@@ -36,21 +40,30 @@ instance Monad (LoopT m) where
 
   {-# INLINE (>>=) #-}
   (>>=) = \loopA kleisliAB ->
-    LoopT $ \yieldB r0 ->
-      let runLoopB = \a r1 -> runLoopT (kleisliAB a) yieldB r1
-      in runLoopT loopA runLoopB r0
+    LoopT $ \ !spec yieldB r0 ->
+      let runLoopB = \a r1 -> runLoopT (kleisliAB a) spec yieldB r1
+      in runLoopT loopA spec runLoopB r0
 
 instance MonadTrans LoopT where
   {-# INLINE lift #-}
-  lift = \inner -> LoopT $ \yield r -> inner >>= \a -> yield a r
+  lift = \inner -> LoopT $ \ !_ yield r -> lift inner >>= \a -> yield a r
 
 instance Foldable (LoopT Identity) where
   {-# INLINE foldr #-}
-  foldr = \f r loopA -> runIdentity $ runLoopT loopA (\a r' -> pure (f a r')) r
+  foldr = \f r loopA ->
+    runIdentity $ runIdentityT $ runLoopT loopA SPEC (\a r' -> pure (f a r')) r
+
+  {-# INLINE foldl' #-}
+  foldl' = \f r loopA ->
+    let foldl'_go = \a () -> do
+          !r0 <- State.get
+          let !r1 = f r0 a
+          State.put r1
+    in runIdentity $! State.execStateT (runLoopT loopA SPEC foldl'_go ()) r
 
 empty :: Applicative f => LoopT f a
 {-# INLINE empty #-}
-empty = LoopT (\_ r -> pure r)
+empty = LoopT (\ !_ _ r -> pure r)
 
 data Step s a
   = Yield a s
@@ -59,14 +72,14 @@ data Step s a
 
 unfold :: Monad m => (s -> m (Step s a)) -> s -> LoopT m a
 {-# INLINE unfold #-}
-unfold = \step s0 -> LoopT $ \yield r0 ->
-  let unfoldT_loop !spec s1 = do
-        st <- step s1
+unfold = \step s0 -> LoopT $ \ !spec yield r0 ->
+  let unfoldT_loop !spec' s1 = do
+        st <- lift $ step s1
         case st of
-          Yield a s2 -> yield a =<< unfoldT_loop spec s2
-          Skip s2 -> unfoldT_loop spec s2
+          Yield a s2 -> yield a =<< unfoldT_loop spec' s2
+          Skip s2 -> unfoldT_loop spec' s2
           Done -> pure r0
-  in unfoldT_loop SPEC s0
+  in unfoldT_loop spec s0
 
 for :: Monad m => a -> (a -> Bool) -> (a -> a) -> LoopT m a
 {-# INLINE for #-}
