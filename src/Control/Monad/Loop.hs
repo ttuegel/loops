@@ -164,6 +164,8 @@ instance Applicative m => Applicative (Loop m) where
     {-# INLINE (<*>) #-}
     (<*>) = \(Loop l) (Loop r) -> Loop (Ap l r)
 
+-- | TODO: '(<|>)' is not actually associative, although the folds can't tell the
+-- difference. With a clever unrolling trick, it could actually be associative.
 instance Applicative f => Alternative (Loop f) where
     {-# INLINE empty #-}
     empty = Loop Zero
@@ -178,6 +180,8 @@ instance Monad m => Monad (Loop m) where
     {-# INLINE (>>=) #-}
     (>>=) = \(Loop as) f -> Loop (Bind as f)
 
+-- | TODO: 'mplus' is not actually associative, although the folds can't tell the
+-- difference. With a clever unrolling trick, it could actually be associative.
 instance Monad m => MonadPlus (Loop m) where
     {-# INLINE mzero #-}
     mzero = Loop Zero
