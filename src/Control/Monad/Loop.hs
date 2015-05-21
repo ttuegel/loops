@@ -3,20 +3,17 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop where
 
 import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
+import Prelude hiding (foldr, foldl)
 
 data Step s a = Done | Skip s | Yield a s
 
