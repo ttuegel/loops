@@ -19,7 +19,7 @@ import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
 -- | Loop shapes, flat or nested.
-data LS = F | N LS LS
+data LS = F | M LS | N LS LS
 
 data Step s a = Done | Skip s | Yield a s
 
@@ -33,17 +33,8 @@ instance Functor (Step s) where
 
 data NLoop :: LS -> (* -> *) -> * -> * where
     Loop0 :: (s -> m (Step s a)) -> s -> NLoop 'F m a
+    Map :: (a -> b) -> NLoop i m a -> NLoop ('M i) m b
     Ap :: NLoop i m (a -> b) -> NLoop j m a -> NLoop ('N i j) m b
-
-instance Functor f => Functor (NLoop i f) where
-    {-# INLINE fmap #-}
-    fmap = fmap_go SPEC where
-      fmap_go :: Functor m => SPEC -> (a -> b) -> NLoop i m a -> NLoop i m b
-      fmap_go !_ = \f -> \case
-        (Loop0 step s) ->
-            let step' t = fmap (fmap f) (step t)
-            in Loop0 step' s
-        (Ap l r) -> Ap (fmap (f .) l) r
 
 class Unroll (n :: LS) where
     nfoldlM :: Monad m => (a -> b -> m a) -> a -> NLoop n m b -> m a
@@ -83,6 +74,16 @@ instance Unroll 'F where
               Skip t' -> nfoldrM_Z_loop spec t'
               Done -> return z
 
+instance Unroll i => Unroll ('M i) where
+    {-# INLINE nfoldlM #-}
+    nfoldlM = \f z (Map g l) -> nfoldlM (\y a -> f y (g a)) z l
+
+    {-# INLINE nfoldlM' #-}
+    nfoldlM' = \f z (Map g l) -> nfoldlM' (\ !y a -> f y (g a)) z l
+
+    {-# INLINE nfoldrM #-}
+    nfoldrM = \f z (Map g l) -> nfoldrM (\a y -> f (g a) y) z l
+
 instance (Unroll i, Unroll j) => Unroll ('N i j) where
     {-# INLINE nfoldlM #-}
     nfoldlM = nfoldlM_S_go where
@@ -106,7 +107,7 @@ data Loop m a = forall (n :: LS). Unroll n => Loop (NLoop n m a)
 
 instance Functor m => Functor (Loop m) where
     {-# INLINE fmap #-}
-    fmap = \f (Loop l) -> Loop (fmap f l)
+    fmap = \f (Loop l) -> Loop (Map f l)
 
 instance Applicative m => Applicative (Loop m) where
     {-# INLINE pure #-}
