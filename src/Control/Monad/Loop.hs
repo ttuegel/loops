@@ -23,14 +23,6 @@ data LS = F | M LS | A LS LS | B LS LS
 
 data Step s a = Done | Skip s | Yield a s
 
-instance Functor (Step s) where
-    {-# INLINE fmap #-}
-    fmap = \f r ->
-        case r of
-          Done -> Done
-          Skip s -> Skip s
-          Yield a s -> Yield (f a) s
-
 data LoopI :: LS -> (* -> *) -> * -> * where
     Flat :: (s -> m (Step s a)) -> s -> LoopI 'F m a
     Map :: (a -> b) -> LoopI i m a -> LoopI ('M i) m b
