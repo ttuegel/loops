@@ -14,12 +14,12 @@
 
 module Control.Monad.Loop where
 
-import Data.Foldable
+import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
 -- | Loop shapes, flat or nested.
-data LS = F | M LS | A LS LS | B LS LS
+data LS = F | M LS | A LS LS | B LS
 
 data Step s a = Done | Skip s | Yield a s
 
@@ -27,7 +27,7 @@ data LoopI :: LS -> (* -> *) -> * -> * where
     Flat :: (s -> m (Step s a)) -> s -> LoopI 'F m a
     Map :: (a -> b) -> LoopI i m a -> LoopI ('M i) m b
     Ap :: LoopI i m (a -> b) -> LoopI j m a -> LoopI ('A i j) m b
-    Bind :: LoopI i m a -> (a -> LoopI j m b) -> LoopI ('B i j) m b
+    Bind :: LoopI i m a -> (a -> Loop m b) -> LoopI ('B i) m b
 
 class Unroll (n :: LS) where
     nfoldlM :: Monad m => (a -> b -> m a) -> a -> LoopI n m b -> m a
@@ -88,18 +88,18 @@ instance (Unroll i, Unroll j) => Unroll ('A i j) where
     nfoldrM = \f z (Ap gs as) ->
         nfoldrM (\g y -> nfoldrM (\a x -> f (g a) x) y as) z gs
 
-instance (Unroll i, Unroll j) => Unroll ('B i j) where
+instance Unroll i => Unroll ('B i) where
     {-# INLINE nfoldlM #-}
     nfoldlM = \f z (Bind as g) ->
-        nfoldlM (\y a -> nfoldlM f y (g a)) z as
+        nfoldlM (\y a -> foldlM f y (g a)) z as
 
     {-# INLINE nfoldlM' #-}
     nfoldlM' = \f z (Bind as g) ->
-        nfoldlM' (\ !y a -> nfoldlM' f y (g a)) z as
+        nfoldlM' (\ !y a -> foldlM' f y (g a)) z as
 
     {-# INLINE nfoldrM #-}
     nfoldrM = \f z (Bind as g) ->
-        nfoldrM (\a y -> nfoldrM f y (g a)) z as
+        nfoldrM (\a y -> foldrM f y (g a)) z as
 
 data Loop m a = forall (n :: LS). Unroll n => Loop (LoopI n m a)
 
@@ -118,6 +118,13 @@ instance Applicative m => Applicative (Loop m) where
     {-# INLINE (<*>) #-}
     (<*>) = \(Loop l) (Loop r) -> Loop (Ap l r)
 
+instance Monad m => Monad (Loop m) where
+    {-# INLINE return #-}
+    return = pure
+
+    {-# INLINE (>>=) #-}
+    (>>=) = \(Loop as) f -> Loop (Bind as f)
+
 instance Foldable (Loop Identity) where
     {-# INLINE foldr #-}
     foldr = \f z (Loop l) ->
@@ -130,6 +137,18 @@ instance Foldable (Loop Identity) where
     {-# INLINE foldl' #-}
     foldl' = \f z (Loop l) ->
         let mf = \ !y a -> Identity (f y a) in runIdentity (nfoldlM' mf z l)
+
+foldlM :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
+{-# INLINE foldlM #-}
+foldlM = \f z (Loop bs) -> nfoldlM f z bs
+
+foldlM' :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
+{-# INLINE foldlM' #-}
+foldlM' = \f z (Loop bs) -> nfoldlM' f z bs
+
+foldrM :: Monad m => (a -> b -> m b) -> b -> Loop m a -> m b
+{-# INLINE foldrM #-}
+foldrM = \f z (Loop bs) -> nfoldrM f z bs
 
 unfoldrM :: Functor f => (s -> f (Maybe (a, s))) -> s -> Loop f a
 {-# INLINE unfoldrM #-}
