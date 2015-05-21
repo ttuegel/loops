@@ -25,13 +25,13 @@ flat_Stream n = S.foldl' it_length 0 stream
     stream :: Stream Int
     stream = S.enumFromStepN 0 1 n
 
-{-
-bind2 :: Int -> Loop Identity Int
-{-# INLINE bind2 #-}
-bind2 = \n -> do
-  _ <- L.enumFromStepN (0 :: Int) 1 n
-  L.enumFromStepN 0 1 n
--}
+bind2_Loop :: Int -> Int
+bind2_Loop n = foldl' it_length 0 loop
+  where
+    loop :: Loop Identity Int
+    loop = do
+      _ <- L.enumFromStepN (0 :: Int) 1 n
+      L.enumFromStepN 0 1 n
 
 ap2_Loop :: Int -> Int
 ap2_Loop n = foldl' it_length 0 loop
@@ -49,14 +49,14 @@ ap2_Stream n = S.foldl' inner 0 stream
     inner :: Int -> Int -> Int
     inner = \len _ -> S.foldl' it_length len stream
 
-{-
-bind3 :: Int -> Loop Identity Int
-{-# INLINE bind3 #-}
-bind3 = \n -> do
-  _ <- L.enumFromStepN (0 :: Int) 1 n
-  _ <- L.enumFromStepN (0 :: Int) 1 n
-  L.enumFromStepN 0 1 n
--}
+bind3_Loop :: Int -> Int
+bind3_Loop n = foldl' it_length 0 loop
+  where
+    loop :: Loop Identity Int
+    loop = do
+      _ <- L.enumFromStepN (0 :: Int) 1 n
+      _ <- L.enumFromStepN (0 :: Int) 1 n
+      L.enumFromStepN 0 1 n
 
 ap3_Loop :: Int -> Int
 ap3_Loop n = foldl' it_length 0 loop
@@ -82,10 +82,10 @@ main =
   defaultMain
   [ bench "Stream/flat" $ nf flat_Stream 1000000
   , bench "Loop/flat" $ nf flat_Loop 1000000
-  --, bench "Loop/bind2" $ nf (foldl' it_length 0 . bind2) (1000 :: Int)
-  --, bench "Loop/bind3" $ nf (foldl' it_length 0 . bind3) (100 :: Int)
   , bench "Stream/ap2" $ nf ap2_Stream 1000
   , bench "Loop/ap2" $ nf ap2_Loop 1000
+  , bench "Loop/bind2" $ nf bind2_Loop 1000
   , bench "Stream/ap3" $ nf ap3_Stream 100
   , bench "Loop/ap3" $ nf ap3_Loop 100
+  , bench "Loop/bind3" $ nf bind3_Loop 100
   ]
