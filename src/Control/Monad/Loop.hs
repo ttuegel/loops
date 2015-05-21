@@ -1,109 +1,151 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop where
 
 import Data.Foldable
+import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
--- Technically, we could get away with just a right fold because left folds can
--- be expressed as right folds. However, GHC is bad at optimizing the function
--- composition. This way, the important optimization is constructor specialization;
--- GHC is good at that.
-newtype Loop a = Loop { runLoop :: forall r.
-                                   SPEC
-                                -> Either (r -> a -> r) (a -> r -> r)
-                                   -- ^ The fold or iteratee, depending on your preferred
-                                   -- terminology. 'Either' a 'Left'-fold or a 'Right'-fold;
-                                   -- the loop associates accordingly.
-                                -> r
-                                -> r
-                      }
+-- | Loop shapes, flat or nested.
+data LS = F | N LS LS
 
-instance Functor Loop where
-  {-# INLINE fmap #-}
-  fmap = \f as ->
-    let fmap_yield_left = \yield r a -> yield r (f a)
-        fmap_yield_right = \yield a r -> yield (f a) r
-    in Loop $ \ !spec y -> runLoop as spec $ both fmap_yield_left fmap_yield_right y
+data Step s a = Done | Skip s | Yield a s
 
-instance Applicative Loop where
-  {-# INLINE pure #-}
-  pure = \a -> Loop $ \ !_ y r ->
-    let pure_loop_left = \yield -> yield r a
-        pure_loop_right = \yield -> yield a r
-    in either pure_loop_left pure_loop_right y
+instance Functor (Step s) where
+    {-# INLINE fmap #-}
+    fmap = \f r ->
+        case r of
+          Done -> Done
+          Skip s -> Skip s
+          Yield a s -> Yield (f a) s
 
-  {-# INLINE (<*>) #-}
-  (<*>) = \fs as -> Loop $ \ !spec y t ->
-    let ap_loop_left = \yieldB r f ->
-          runLoop as spec (Left $ \s a -> yieldB s (f a)) r
-        ap_loop_right = \yieldB f r ->
-          runLoop as spec (Right $ \a s -> yieldB (f a) s) r
-    in runLoop fs spec (both ap_loop_left ap_loop_right y) t
+data NLoop :: LS -> (* -> *) -> * -> * where
+    Loop0 :: (s -> m (Step s a)) -> s -> NLoop 'F m a
+    Ap :: NLoop i m (a -> b) -> NLoop j m a -> NLoop ('N i j) m b
 
-instance Monad Loop where
-  {-# INLINE return #-}
-  return = pure
+instance Functor f => Functor (NLoop i f) where
+    {-# INLINE fmap #-}
+    fmap = fmap_go SPEC where
+      fmap_go :: Functor m => SPEC -> (a -> b) -> NLoop i m a -> NLoop i m b
+      fmap_go !_ = \f -> \case
+        (Loop0 step s) ->
+            let step' t = fmap (fmap f) (step t)
+            in Loop0 step' s
+        (Ap l r) -> Ap (fmap (f .) l) r
 
-  {-# INLINE [1] (>>=) #-}
-  (>>=) = \as f -> Loop $ \ !spec y s ->
-    let bind_loop_left = \_ r a -> runLoop (f a) spec y r
-        bind_loop_right = \_ a r -> runLoop (f a) spec y r
-    in runLoop as spec (both bind_loop_left bind_loop_right y) s
+class Unroll (n :: LS) where
+    nfoldlM :: Monad m => (a -> b -> m a) -> a -> NLoop n m b -> m a
+    nfoldlM' :: Monad m => (a -> b -> m a) -> a -> NLoop n m b -> m a
+    nfoldrM :: Monad m => (a -> b -> m b) -> b -> NLoop n m a -> m b
 
-instance Foldable Loop where
-  {-# INLINE foldr #-}
-  foldr = \f r as -> runLoop as SPEC (Right f) r
+instance Unroll 'F where
+    {-# INLINE nfoldlM #-}
+    nfoldlM = nfoldlM_Z_go where
+      nfoldlM_Z_go :: Monad m => (a -> b -> m a) -> a -> NLoop 'F m b -> m a
+      nfoldlM_Z_go f z (Loop0 step s) = nfoldlM_Z_loop SPEC s z where
+        nfoldlM_Z_loop !spec t y = do
+            r <- step t
+            case r of
+              Yield a t' -> f y a >>= nfoldlM_Z_loop spec t'
+              Skip t' -> nfoldlM_Z_loop spec t' y
+              Done -> return y
 
-  {-# INLINE foldl' #-}
-  foldl' = \f r as -> let g = \ !s a -> f s a in runLoop as SPEC (Left g) r
+    {-# INLINE nfoldlM' #-}
+    nfoldlM' = \f z (Loop0 step s) ->
+        let nfoldlM'_Z_loop !spec t !y = do
+                r <- step t
+                case r of
+                  Yield a t' -> f y a >>= nfoldlM'_Z_loop spec t'
+                  Skip t' -> nfoldlM'_Z_loop spec t' y
+                  Done -> return y
+        in nfoldlM'_Z_loop SPEC s z
 
-empty :: Loop a
-{-# INLINE empty #-}
-empty = Loop (\ !_ _ r -> r)
+    {-# INLINE nfoldrM #-}
+    nfoldrM = nfoldrM_Z_go where
+      nfoldrM_Z_go :: Monad m => (a -> b -> m b) -> b -> NLoop 'F m a -> m b
+      nfoldrM_Z_go f z (Loop0 step s) = nfoldrM_Z_loop SPEC s where
+        nfoldrM_Z_loop !spec t = do
+            r <- step t
+            case r of
+              Yield a t' -> f a =<< nfoldrM_Z_loop spec t'
+              Skip t' -> nfoldrM_Z_loop spec t'
+              Done -> return z
 
-data Step s a
-  = Yield a s
-  | Skip s
-  | Done
+instance (Unroll i, Unroll j) => Unroll ('N i j) where
+    {-# INLINE nfoldlM #-}
+    nfoldlM = nfoldlM_S_go where
+      nfoldlM_S_go :: Monad m => (a -> b -> m a) -> a -> NLoop ('N i j) m b -> m a
+      nfoldlM_S_go f z (Ap l r) = nfoldlM nfoldlM_S_loop z l where
+        nfoldlM_S_loop = \y g -> nfoldlM (\x a -> f x (g a)) y r
 
-unfold :: (s -> Step s a) -> s -> Loop a
-{-# INLINE unfold #-}
-unfold = \step s0 -> Loop $ \ !_ y r0 ->
+    {-# INLINE nfoldlM' #-}
+    nfoldlM' = nfoldlM'_S_go where
+      nfoldlM'_S_go :: Monad m => (a -> b -> m a) -> a -> NLoop ('N i j) m b -> m a
+      nfoldlM'_S_go f z (Ap l r) = nfoldlM' nfoldlM'_S_loop z l where
+        nfoldlM'_S_loop = \ !y g -> nfoldlM' (\ !x a -> f x (g a)) y r
 
-  let unfold_loop_left = \yield ->
-        let unfold_loop_left_go = \ !spec s1 r ->
-              case step s1 of
-                Yield a s2 -> unfold_loop_left_go spec s2 (yield r a)
-                Skip s2 -> unfold_loop_left_go spec s2 r
-                Done -> r
-        in unfold_loop_left_go SPEC s0 r0
+    {-# INLINE nfoldrM #-}
+    nfoldrM = nfoldrM_S_go where
+      nfoldrM_S_go :: Monad m => (a -> b -> m b) -> b -> NLoop ('N i j) m a -> m b
+      nfoldrM_S_go f z (Ap l r) = nfoldrM nfoldrM_S_loop z l where
+        nfoldrM_S_loop = \g y -> nfoldrM (\a x -> f (g a) x) y r
 
-      unfold_loop_right = \yield ->
-        let unfold_loop_right_go = \ !spec s1 ->
-              case step s1 of
-                Yield a s2 -> yield a (unfold_loop_right_go spec s2)
-                Skip s2 -> unfold_loop_right_go spec s2
-                Done -> r0
-        in unfold_loop_right_go SPEC s0
+data Loop m a = forall (n :: LS). Unroll n => Loop (NLoop n m a)
 
-  in either unfold_loop_left unfold_loop_right y
+instance Functor m => Functor (Loop m) where
+    {-# INLINE fmap #-}
+    fmap = \f (Loop l) -> Loop (fmap f l)
 
-for :: a -> (a -> Bool) -> (a -> a) -> Loop a
-{-# INLINE for #-}
-for = \a check next -> unfold (\s -> if check s then Yield s (next s) else Done) a
+instance Applicative m => Applicative (Loop m) where
+    {-# INLINE pure #-}
+    pure = \a ->
+      let pure_step !_ = \case
+              True -> pure (Yield a False)
+              False -> pure Done
+      in Loop (Loop0 (pure_step SPEC) True)
 
-enumFromStepN :: Num a => a -> a -> Int -> Loop a
+    {-# INLINE (<*>) #-}
+    (<*>) = \(Loop l) (Loop r) -> Loop (Ap l r)
+
+instance Foldable (Loop Identity) where
+    {-# INLINE foldr #-}
+    foldr = \f z (Loop l) ->
+        let mf = \a y -> Identity (f a y) in runIdentity (nfoldrM mf z l)
+
+    {-# INLINE foldl #-}
+    foldl = \f z (Loop l) ->
+        let mf = \y a -> Identity (f y a) in runIdentity (nfoldlM mf z l)
+
+    {-# INLINE foldl' #-}
+    foldl' = \f z (Loop l) ->
+        let mf = \ !y a -> Identity (f y a) in runIdentity (nfoldlM' mf z l)
+
+unfoldrM :: Functor f => (s -> f (Maybe (a, s))) -> s -> Loop f a
+{-# INLINE unfoldrM #-}
+unfoldrM = \step s -> Loop (Loop0 (fmap maybeToStep . step) s)
+
+maybeToStep :: Maybe (a, s) -> Step s a
+{-# INLINE maybeToStep #-}
+maybeToStep = \case
+  Just (a, s) -> Yield a s
+  Nothing -> Done
+
+enumFromStepN :: (Applicative f, Num a) => a -> a -> Int -> Loop f a
 {-# INLINE enumFromStepN #-}
 enumFromStepN = \ !x !y !n ->
-  let step = \(w, m) ->
-        case m > 0 of
-          True -> let v = w + y in Yield v (v, m - 1)
-          False -> Done
-  in unfold step (x, n)
-
-both :: (a -> c) -> (b -> d) -> Either a b -> Either c d
-{-# INLINE both #-}
-both = \fl fr -> either (Left . fl) (Right . fr)
+    let step (w, m)
+          | m > 0 = pure (Yield w (w + y, m - 1))
+          | otherwise = pure Done
+    in Loop (Loop0 step (x, n))
