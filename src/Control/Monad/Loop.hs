@@ -16,6 +16,7 @@ import Control.Applicative (Applicative(..), Alternative(..))
 #else
 import Control.Applicative (Alternative(..))
 #endif
+import Control.Monad (MonadPlus(..))
 import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
@@ -172,10 +173,17 @@ instance Applicative f => Alternative (Loop f) where
 
 instance Monad m => Monad (Loop m) where
     {-# INLINE return #-}
-    return = pure
+    return = \a -> Loop (Pure a)
 
     {-# INLINE (>>=) #-}
     (>>=) = \(Loop as) f -> Loop (Bind as f)
+
+instance Monad m => MonadPlus (Loop m) where
+    {-# INLINE mzero #-}
+    mzero = Loop Zero
+
+    {-# INLINE mplus #-}
+    mplus = \(Loop l) (Loop r) -> Loop (Alt l r)
 
 instance Foldable (Loop Identity) where
     {-# INLINE foldr #-}
