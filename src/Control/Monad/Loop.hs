@@ -27,6 +27,8 @@ data LS = F        -- ^ flat loop
         | P        -- ^ pure loop
         | A LS LS  -- ^ applied loop
         | B LS     -- ^ bound loop
+        | S LS LS  -- ^ sequential loops
+        | Z        -- ^ empty loop
 
 -- | Loops indexed by their shapes. Note that inner loops always have
 -- a smaller shape than their containing loops.
@@ -36,6 +38,8 @@ data LoopI :: LS -> (* -> *) -> * -> * where
     Pure :: a -> LoopI 'P m a
     Ap :: LoopI i m (a -> b) -> LoopI j m a -> LoopI ('A i j) m b
     Bind :: LoopI i m a -> (a -> Loop m b) -> LoopI ('B i) m b
+    Alt :: LoopI i m a -> LoopI j m a -> LoopI ('S i j) m a
+    Zero :: LoopI 'Z m a
 
 -- | Folds over loops indexed by their shapes. The 'LS' index is used to
 -- drive inlining. Because inner loops always have a smaller shape than their
@@ -123,6 +127,26 @@ instance Unroll i => Unroll ('B i) where
     {-# INLINE nfoldrM #-}
     nfoldrM = \f z (Bind as g) ->
         nfoldrM (\a y -> foldrM f y (g a)) z as
+
+instance (Unroll i, Unroll j) => Unroll ('S i j) where
+    {-# INLINE nfoldlM #-}
+    nfoldlM = \f z (Alt l r) -> nfoldlM f z l >>= (\y -> nfoldlM f y r)
+
+    {-# INLINE nfoldlM' #-}
+    nfoldlM' = \f z (Alt l r) -> nfoldlM' f z l >>= (\y -> nfoldlM' f y r)
+
+    {-# INLINE nfoldrM #-}
+    nfoldrM = \f z (Alt l r) -> (\y -> nfoldrM f y l) =<< (nfoldrM f z r)
+
+instance Unroll 'Z where
+    {-# INLINE nfoldlM #-}
+    nfoldlM = \_ z Zero -> return z
+
+    {-# INLINE nfoldlM' #-}
+    nfoldlM' = \_ z Zero -> return z
+
+    {-# INLINE nfoldrM #-}
+    nfoldrM = \_ z Zero -> return z
 
 data Loop m a = forall (n :: LS). Unroll n => Loop (LoopI n m a)
 
