@@ -17,6 +17,8 @@ import Control.Applicative (Applicative(..), Alternative(..))
 import Control.Applicative (Alternative(..))
 #endif
 import Control.Monad (MonadPlus(..))
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
@@ -38,7 +40,7 @@ data LS = F        -- ^ flat loop
 data LoopI :: LS -> (* -> *) -> * -> * where
     Flat :: (s -> m (Step s a)) -> s -> LoopI 'F m a
     Map :: (a -> b) -> LoopI i m a -> LoopI ('M i) m b
-    Pure :: a -> LoopI 'P m a
+    Pure :: m a -> LoopI 'P m a
     Ap :: LoopI i m (a -> b) -> LoopI j m a -> LoopI ('A i j) m b
     Bind :: LoopI i m a -> (a -> Loop m b) -> LoopI ('B i) m b
     Alt :: LoopI i m a -> LoopI j m a -> LoopI ('S i j) m a
@@ -97,13 +99,13 @@ instance Unroll i => Unroll ('M i) where
 
 instance Unroll 'P where
     {-# INLINE nfoldlM #-}
-    nfoldlM = \f z (Pure a) -> f z a
+    nfoldlM = \f z (Pure a) -> a >>= f z
 
     {-# INLINE nfoldlM' #-}
-    nfoldlM' = \f z (Pure a) -> f z a
+    nfoldlM' = \f z (Pure a) -> a >>= f z
 
     {-# INLINE nfoldrM #-}
-    nfoldrM = \f z (Pure a) -> f a z
+    nfoldrM = \f z (Pure a) -> a >>= \b -> f b z
 
 instance (Unroll i, Unroll j) => Unroll ('A i j) where
     {-# INLINE nfoldlM #-}
@@ -159,7 +161,7 @@ instance Functor m => Functor (Loop m) where
 
 instance Applicative m => Applicative (Loop m) where
     {-# INLINE pure #-}
-    pure = \a -> Loop (Pure a)
+    pure = \a -> Loop (Pure (pure a))
 
     {-# INLINE (<*>) #-}
     (<*>) = \(Loop l) (Loop r) -> Loop (Ap l r)
@@ -175,7 +177,7 @@ instance Applicative f => Alternative (Loop f) where
 
 instance Monad m => Monad (Loop m) where
     {-# INLINE return #-}
-    return = \a -> Loop (Pure a)
+    return = \a -> Loop (Pure (return a))
 
     {-# INLINE (>>=) #-}
     (>>=) = \(Loop as) f -> Loop (Bind as f)
@@ -188,6 +190,14 @@ instance Monad m => MonadPlus (Loop m) where
 
     {-# INLINE mplus #-}
     mplus = \(Loop l) (Loop r) -> Loop (Alt l r)
+
+instance MonadTrans Loop where
+    {-# INLINE lift #-}
+    lift = \inner -> Loop (Pure inner)
+
+instance MonadIO m => MonadIO (Loop m) where
+    {-# INLINE liftIO #-}
+    liftIO = \inner -> lift (liftIO inner)
 
 instance Foldable (Loop Identity) where
     {-# INLINE foldr #-}
