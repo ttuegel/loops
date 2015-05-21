@@ -18,17 +18,27 @@ import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
 import GHC.Types (SPEC(..))
 
--- | Loop shapes, flat or nested.
-data LS = F | M LS | A LS LS | B LS
-
 data Step s a = Done | Skip s | Yield a s
 
+-- | Promoted data type for tracking loop shapes.
+data LS = F        -- ^ flat loop
+        | M LS     -- ^ mapped loop
+        | A LS LS  -- ^ applied loop
+        | B LS     -- ^ bound loop
+
+-- | Loops indexed by their shapes. Note that inner loops always have
+-- a smaller shape than their containing loops.
 data LoopI :: LS -> (* -> *) -> * -> * where
     Flat :: (s -> m (Step s a)) -> s -> LoopI 'F m a
     Map :: (a -> b) -> LoopI i m a -> LoopI ('M i) m b
     Ap :: LoopI i m (a -> b) -> LoopI j m a -> LoopI ('A i j) m b
     Bind :: LoopI i m a -> (a -> Loop m b) -> LoopI ('B i) m b
 
+-- | Folds over loops indexed by their shapes. The 'LS' index is used to
+-- drive inlining. Because inner loops always have a smaller shape than their
+-- containing loops, it is safe to call these class members recursively within
+-- their own implementations: the 'LS' index of the inner loop always differs,
+-- so GHC will inline all the \"recursive\" calls.
 class Unroll (n :: LS) where
     nfoldlM :: Monad m => (a -> b -> m a) -> a -> LoopI n m b -> m a
     nfoldlM' :: Monad m => (a -> b -> m a) -> a -> LoopI n m b -> m a
