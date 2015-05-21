@@ -12,7 +12,9 @@
 module Control.Monad.Loop where
 
 #if __GLASGOW_HASKELL__ < 710
-import Control.Applicative (Applicative(..))
+import Control.Applicative (Applicative(..), Alternative(..))
+#else
+import Control.Applicative (Alternative(..))
 #endif
 import Data.Foldable (Foldable(foldr, foldl', foldl))
 import Data.Functor.Identity
@@ -160,6 +162,13 @@ instance Applicative m => Applicative (Loop m) where
 
     {-# INLINE (<*>) #-}
     (<*>) = \(Loop l) (Loop r) -> Loop (Ap l r)
+
+instance Applicative f => Alternative (Loop f) where
+    {-# INLINE empty #-}
+    empty = Loop Zero
+
+    {-# INLINE (<|>) #-}
+    (<|>) = \(Loop l) (Loop r) -> Loop (Alt l r)
 
 instance Monad m => Monad (Loop m) where
     {-# INLINE return #-}
