@@ -231,30 +231,6 @@ instance Unroll 'Z where
           Skip _ -> return y
           Done -> return y
 
-nfoldlM :: (Unroll n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
-{-# INLINE nfoldlM #-}
-nfoldlM = \f x l ->
-  iterl l (\y -> \case
-    Yield a s -> f y a >>= \z -> return $ Yield z s
-    Skip s -> return $ Skip s
-    Done -> return Done) x
-
-nfoldlM' :: (Unroll n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
-{-# INLINE nfoldlM' #-}
-nfoldlM' = \f x l ->
-  iterl' l (\y -> \case
-    Yield a s -> f y a >>= \z -> return $ Yield z s
-    Skip s -> return $ Skip s
-    Done -> return Done) x
-
-nfoldrM :: (Unroll n, Monad m) => (a -> b -> m b) -> b -> LoopI n m a -> m b
-{-# INLINE nfoldrM #-}
-nfoldrM = \f x l ->
-  iterr l (\case
-    Yield a s -> \y -> f a y >>= \z -> return $ Yield z s
-    Skip s -> \_ -> return $ Skip s
-    Done -> \_ -> return Done) x
-
 data Loop m a = forall (n :: LS). Unroll n => Loop (LoopI n m a)
 
 instance Applicative m => Functor (Loop m) where
@@ -303,28 +279,40 @@ instance MonadIO m => MonadIO (Loop m) where
 
 instance Foldable (Loop Identity) where
     {-# INLINE foldr #-}
-    foldr = \f z (Loop l) ->
-        let mf = \a y -> Identity (f a y) in runIdentity (nfoldrM mf z l)
+    foldr = \f z as ->
+        let mf = \a y -> Identity (f a y) in runIdentity (foldrM mf z as)
 
     {-# INLINE foldl #-}
-    foldl = \f z (Loop l) ->
-        let mf = \y a -> Identity (f y a) in runIdentity (nfoldlM mf z l)
+    foldl = \f z bs ->
+        let mf = \y a -> Identity (f y a) in runIdentity (foldlM mf z bs)
 
     {-# INLINE foldl' #-}
-    foldl' = \f z (Loop l) ->
-        let mf = \ !y a -> Identity (f y a) in runIdentity (nfoldlM' mf z l)
+    foldl' = \f z bs ->
+        let mf = \ !y a -> Identity (f y a) in runIdentity (foldlM' mf z bs)
 
 foldlM :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
 {-# INLINE foldlM #-}
-foldlM = \f z (Loop bs) -> nfoldlM f z bs
+foldlM = \f x (Loop bs) ->
+  iterl bs (\y -> \case
+    Yield a s -> f y a >>= \z -> return $ Yield z s
+    Skip s -> return $ Skip s
+    Done -> return Done) x
 
 foldlM' :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
 {-# INLINE foldlM' #-}
-foldlM' = \f z (Loop bs) -> nfoldlM' f z bs
+foldlM' = \f x (Loop bs) ->
+  iterl' bs (\y -> \case
+    Yield a s -> f y a >>= \z -> return $ Yield z s
+    Skip s -> return $ Skip s
+    Done -> return Done) x
 
 foldrM :: Monad m => (a -> b -> m b) -> b -> Loop m a -> m b
 {-# INLINE foldrM #-}
-foldrM = \f z (Loop bs) -> nfoldrM f z bs
+foldrM = \f x (Loop as) ->
+  iterr as (\case
+    Yield a s -> \y -> f a y >>= \z -> return $ Yield z s
+    Skip s -> \_ -> return $ Skip s
+    Done -> \_ -> return Done) x
 
 unfoldrM :: Functor f => (s -> f (Maybe (a, s))) -> s -> Loop f a
 {-# INLINE unfoldrM #-}
