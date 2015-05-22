@@ -60,12 +60,12 @@ data LoopI :: LS -> (* -> *) -> * -> * where
 -- containing loops, it is safe to call these class members recursively within
 -- their own implementations: the 'LS' index of the inner loop always differs,
 -- so GHC will inline all the \"recursive\" calls.
-class Iter (n :: LS) where
+class Unroll (n :: LS) where
     iterl :: Monad m => LoopI n m a -> (forall s. r -> Step s a -> m (Step s r)) -> r -> m r
     iterl' :: Monad m => LoopI n m a -> (forall s. r -> Step s a -> m (Step s r)) -> r -> m r
     iterr :: Monad m => LoopI n m a -> (forall s. Step s a -> r -> m (Step s r)) -> r -> m r
 
-instance Iter 'F where
+instance Unroll 'F where
     {-# INLINE iterl #-}
     iterl = \(Flat step s) cont ->
         let iterl_F_loop !spec t = \y -> do
@@ -96,7 +96,7 @@ instance Iter 'F where
                   Done -> return y
         in iterr_F_loop SPEC s
 
-instance Iter i => Iter ('M i) where
+instance Unroll i => Unroll ('M i) where
     {-# INLINE iterl #-}
     iterl = \(Map m i) cont -> iterl i $ \r a -> m a >>= cont r
 
@@ -106,7 +106,7 @@ instance Iter i => Iter ('M i) where
     {-# INLINE iterr #-}
     iterr = \(Map m i) cont -> iterr i $ \a r -> m a >>= \b -> cont b r
 
-instance Iter 'P where
+instance Unroll 'P where
     {-# INLINE iterl #-}
     iterl = \(Pure ma) cont y -> do
         a <- ma
@@ -134,7 +134,7 @@ instance Iter 'P where
           Skip () -> return y
           Done -> return y
 
-instance (Iter i, Iter j) => Iter ('A i j) where
+instance (Unroll i, Unroll j) => Unroll ('A i j) where
     {-# INLINE iterl #-}
     iterl = \(Ap fs as) cont ->
         iterl fs $ \y -> \case
@@ -162,7 +162,7 @@ instance (Iter i, Iter j) => Iter ('A i j) where
           Skip s -> \_ -> return $ Skip s
           Done -> \_ -> return Done
 
-instance Iter i => Iter ('B i) where
+instance Unroll i => Unroll ('B i) where
     {-# INLINE iterl #-}
     iterl = \(Bind as f) cont ->
         iterl as $ \y -> \case
@@ -196,7 +196,7 @@ instance Iter i => Iter ('B i) where
           Skip s -> \_ -> return $ Skip s
           Done -> \_ -> return Done
 
-instance (Iter i, Iter j) => Iter ('S i j) where
+instance (Unroll i, Unroll j) => Unroll ('S i j) where
     {-# INLINE iterl #-}
     iterl = \(Alt i j) cont z -> iterl i cont z >>= iterl j cont
 
@@ -206,7 +206,7 @@ instance (Iter i, Iter j) => Iter ('S i j) where
     {-# INLINE iterr #-}
     iterr = \(Alt i j) cont z -> iterr i cont =<< iterr j cont z
 
-instance Iter 'Z where
+instance Unroll 'Z where
     {-# INLINE iterl #-}
     iterl = \Zero cont y -> do
         r <- cont y Done
@@ -231,7 +231,7 @@ instance Iter 'Z where
           Skip _ -> return y
           Done -> return y
 
-nfoldlM :: (Iter n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
+nfoldlM :: (Unroll n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
 {-# INLINE nfoldlM #-}
 nfoldlM = \f x l ->
   iterl l (\y -> \case
@@ -239,7 +239,7 @@ nfoldlM = \f x l ->
     Skip s -> return $ Skip s
     Done -> return Done) x
 
-nfoldlM' :: (Iter n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
+nfoldlM' :: (Unroll n, Monad m) => (a -> b -> m a) -> a -> LoopI n m b -> m a
 {-# INLINE nfoldlM' #-}
 nfoldlM' = \f x l ->
   iterl' l (\y -> \case
@@ -247,7 +247,7 @@ nfoldlM' = \f x l ->
     Skip s -> return $ Skip s
     Done -> return Done) x
 
-nfoldrM :: (Iter n, Monad m) => (a -> b -> m b) -> b -> LoopI n m a -> m b
+nfoldrM :: (Unroll n, Monad m) => (a -> b -> m b) -> b -> LoopI n m a -> m b
 {-# INLINE nfoldrM #-}
 nfoldrM = \f x l ->
   iterr l (\case
@@ -255,7 +255,7 @@ nfoldrM = \f x l ->
     Skip s -> \_ -> return $ Skip s
     Done -> \_ -> return Done) x
 
-data Loop m a = forall (n :: LS). Iter n => Loop (LoopI n m a)
+data Loop m a = forall (n :: LS). Unroll n => Loop (LoopI n m a)
 
 instance Applicative m => Functor (Loop m) where
     {-# INLINE fmap #-}
@@ -354,6 +354,6 @@ filterM = \check (Loop l) ->
       Skip s -> return $ Skip s
       Done -> return Done) l)
 
-filter :: (a -> Bool) -> Loop m a -> Loop m a
+filter :: Monad m => (a -> Bool) -> Loop m a -> Loop m a
 {-# INLINE filter #-}
 filter = \check -> filterM (return . check)
