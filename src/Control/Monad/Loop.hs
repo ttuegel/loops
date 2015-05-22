@@ -343,3 +343,17 @@ enumFromStepN = \ !x !y !n ->
           | m > 0 = pure (Yield w (w + y, m - 1))
           | otherwise = pure Done
     in Loop (Flat step (x, n))
+
+filterM :: Monad m => (a -> m Bool) -> Loop m a -> Loop m a
+{-# INLINE filterM #-}
+filterM = \check (Loop l) ->
+    Loop (Map (\case
+      Yield a s -> do
+        p <- check a
+        return $ if p then Yield a s else Skip s
+      Skip s -> return $ Skip s
+      Done -> return Done) l)
+
+filter :: (a -> Bool) -> Loop m a -> Loop m a
+{-# INLINE filter #-}
+filter = \check -> filterM (return . check)
