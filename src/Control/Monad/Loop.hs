@@ -8,7 +8,6 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop where
@@ -301,7 +300,7 @@ foldlM = \f x (Loop bs) ->
 foldlM' :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
 {-# INLINE foldlM' #-}
 foldlM' = \f x (Loop bs) ->
-  iterl' bs (\y -> \case
+  iterl' bs (\ !y -> \case
     Yield a s -> f y a >>= \z -> return $ Yield z s
     Skip s -> return $ Skip s
     Done -> return Done) x
@@ -345,3 +344,17 @@ filterM = \check (Loop l) ->
 filter :: Monad m => (a -> Bool) -> Loop m a -> Loop m a
 {-# INLINE filter #-}
 filter = \check -> filterM (return . check)
+
+generateM :: Monad m => Int -> (Int -> m a) -> Loop m a
+{-# INLINE generateM #-}
+generateM = \ !len gen ->
+  let step n
+        | n < len = do
+            a <- gen n
+            return $ Yield a (n + 1)
+        | otherwise = return Done
+  in Loop (Flat step 0)
+
+generate :: Monad m => Int -> (Int -> a) -> Loop m a
+{-# INLINE generate #-}
+generate = \len gen -> generateM len (return . gen)
