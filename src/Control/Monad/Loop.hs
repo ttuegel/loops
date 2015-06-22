@@ -8,6 +8,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Loop where
@@ -66,48 +67,68 @@ class Unroll (n :: LS) where
 
 instance Unroll 'F where
     {-# INLINE iterl #-}
-    iterl = \(Flat step s) cont ->
-        let iterl_F_loop !spec t = \y -> do
-                q <- step t >>= cont y
-                case q of
-                  Yield z u -> iterl_F_loop spec u z
-                  Skip u -> iterl_F_loop spec u y
-                  Done -> return y
-        in iterl_F_loop SPEC s
+    iterl (Flat step s) cont z = iterl_F_loop SPEC s z where
+      iterl_F_loop !spec t y = do
+          a <- step t
+          q <- cont y a
+          case q of
+            Yield x u -> iterl_F_loop spec u x
+            Skip u -> iterl_F_loop spec u y
+            Done -> return y
 
     {-# INLINE iterl' #-}
-    iterl' = \(Flat step s) cont ->
-        let iterl'_F_loop !spec t = \ !y -> do
-                q <- step t >>= cont y
-                case q of
-                  Yield !z u -> iterl'_F_loop spec u z
-                  Skip u -> iterl'_F_loop spec u y
-                  Done -> return y
-        in iterl'_F_loop SPEC s
+    iterl' (Flat step s) cont z = iterl'_F_loop SPEC s z where
+      iterl'_F_loop !spec t !y = do
+          a <- step t
+          q <- cont y a
+          case q of
+            Yield !x u -> iterl'_F_loop spec u x
+            Skip u -> iterl'_F_loop spec u y
+            Done -> return y
 
     {-# INLINE iterr #-}
-    iterr = \(Flat step s) cont ->
-        let iterr_F_loop !spec t = \y -> do
-                q <- step t >>= \a -> cont a y
-                case q of
-                  Yield z u -> iterr_F_loop spec u z
-                  Skip u -> iterr_F_loop spec u y
-                  Done -> return y
-        in iterr_F_loop SPEC s
+    iterr (Flat step s) cont = iterr_F_loop SPEC s where
+      iterr_F_loop !spec t = \y -> do
+          a <- step t
+          q <- cont a y
+          case q of
+            Yield z u -> iterr_F_loop spec u z
+            Skip u -> iterr_F_loop spec u y
+            Done -> return y
 
 instance Unroll i => Unroll ('M i) where
     {-# INLINE iterl #-}
-    iterl = \(Map m i) cont -> iterl i $ \r a -> m a >>= cont r
+    iterl
+      (Map m (i :: LoopI i m b) :: LoopI ('M i) m a)
+      (cont :: forall s. r -> Step s a -> m (Step s r))
+      z =
+          iterl i iterl_M_go z where
+            iterl_M_go :: forall s. r -> Step s b -> m (Step s r)
+            iterl_M_go r a = m a >>= cont r
 
     {-# INLINE iterl' #-}
-    iterl' = \(Map m i) cont -> iterl' i $ \ !r a -> m a >>= cont r
+    iterl'
+      (Map m (i :: LoopI i m b) :: LoopI ('M i) m a)
+      (cont :: forall s. r -> Step s a -> m (Step s r))
+      z =
+          iterl' i iterl'_M_go z where
+            iterl'_M_go :: forall s. r -> Step s b -> m (Step s r)
+            iterl'_M_go !r a = m a >>= cont r
 
     {-# INLINE iterr #-}
-    iterr = \(Map m i) cont -> iterr i $ \a r -> m a >>= \b -> cont b r
+    iterr
+      (Map m (i :: LoopI i m b) :: LoopI ('M i) m a)
+      (cont :: forall s. Step s a -> r -> m (Step s r))
+      z =
+          iterr i iterr_M_go z where
+            iterr_M_go :: forall s. Step s b -> r -> m (Step s r)
+            iterr_M_go a r = do
+                b <- m a
+                cont b r
 
 instance Unroll 'P where
     {-# INLINE iterl #-}
-    iterl = \(Pure ma) cont y -> do
+    iterl (Pure ma) cont y = do
         a <- ma
         r <- cont y (Yield a ())
         case r of
@@ -116,7 +137,7 @@ instance Unroll 'P where
           Done -> return y
 
     {-# INLINE iterl' #-}
-    iterl' = \(Pure ma) cont y -> do
+    iterl' (Pure ma) cont y = do
         a <- ma
         r <- cont y (Yield a ())
         case r of
@@ -125,7 +146,7 @@ instance Unroll 'P where
           Done -> return y
 
     {-# INLINE iterr #-}
-    iterr = \(Pure ma) cont y -> do
+    iterr (Pure ma) cont y = do
         a <- ma
         r <- cont (Yield a ()) y
         case r of
@@ -135,79 +156,115 @@ instance Unroll 'P where
 
 instance (Unroll i, Unroll j) => Unroll ('A i j) where
     {-# INLINE iterl #-}
-    iterl = \(Ap fs as) cont ->
-        iterl fs $ \y -> \case
-          Yield f s -> do
-            z <- iterl (Map (return . fmap f) as) cont y
-            return $ Yield z s
-          Skip s -> return $ Skip s
-          Done -> return Done
+    iterl
+      (Ap (fs :: LoopI i m (a -> b)) (as :: LoopI j m a) :: LoopI ('A i j) m b)
+      (cont :: forall s. r -> Step s b -> m (Step s r))
+      z =
+          iterl fs iterl_A_go z where
+            iterl_A_go :: forall s. r -> Step s (a -> b) -> m (Step s r)
+            iterl_A_go y a =
+                case a of
+                  Yield f s -> do
+                      x <- iterl (Map (return . fmap f) as) cont y
+                      return (Yield x s)
+                  Skip s -> return (Skip s)
+                  Done -> return Done
 
     {-# INLINE iterl' #-}
-    iterl' = \(Ap fs as) cont ->
-        iterl' fs $ \ !y -> \case
-          Yield f s -> do
-            !z <- iterl' (Map (return . fmap f) as) cont y
-            return $ Yield z s
-          Skip s -> return $ Skip s
-          Done -> return Done
+    iterl'
+      (Ap (fs :: LoopI i m (a -> b)) (as :: LoopI j m a) :: LoopI ('A i j) m b)
+      (cont :: forall s. r -> Step s b -> m (Step s r))
+      z =
+          iterl' fs iterl'_A_go z where
+            iterl'_A_go :: forall s. r -> Step s (a -> b) -> m (Step s r)
+            iterl'_A_go !y a =
+              case a of
+                Yield f s -> do
+                  !x <- iterl' (Map (return . fmap f) as) cont y
+                  return (Yield x s)
+                Skip s -> return $ Skip s
+                Done -> return Done
 
     {-# INLINE iterr #-}
-    iterr = \(Ap fs as) cont ->
-        iterr fs $ \case
-          Yield f s -> \y -> do
-            z <- iterr (Map (return . fmap f) as) cont y
-            return $ Yield z s
-          Skip s -> \_ -> return $ Skip s
-          Done -> \_ -> return Done
+    iterr
+      (Ap (fs :: LoopI i m (a -> b)) (as :: LoopI j m a) :: LoopI ('A i j) m b)
+      (cont :: forall s. Step s b -> r -> m (Step s r))
+      z =
+          iterr fs iterr_A_go z where
+            iterr_A_go :: forall s. Step s (a -> b) -> r -> m (Step s r)
+            iterr_A_go a y =
+              case a of
+                Yield f s -> do
+                  x <- iterr (Map (return . fmap f) as) cont y
+                  return (Yield x s)
+                Skip s -> return (Skip s)
+                Done -> return Done
 
 instance Unroll i => Unroll ('B i) where
     {-# INLINE iterl #-}
-    iterl = \(Bind as f) cont ->
-        iterl as $ \y -> \case
-          Yield a s ->
-            case f a of
-              Loop l -> do
-                z <- iterl l cont y
-                return $ Yield z s
-          Skip s -> return $ Skip s
-          Done -> return Done
+    iterl
+      (Bind (as :: LoopI i m a) (f :: a -> Loop m b) :: LoopI ('B i) m b)
+      (cont :: forall s. r -> Step s b -> m (Step s r))
+      z =
+          iterl as iterl_B_go z where
+            iterl_B_go :: forall s. r -> Step s a -> m (Step s r)
+            iterl_B_go y st =
+              case st of
+                Yield a s ->
+                  case f a of
+                    Loop l -> do
+                      x <- iterl l cont y
+                      return (Yield x s)
+                Skip s -> return (Skip s)
+                Done -> return Done
 
     {-# INLINE iterl' #-}
-    iterl' = \(Bind as f) cont ->
-        iterl' as $ \ !y -> \case
-          Yield a s ->
-            case f a of
-              Loop l -> do
-                !z <- iterl l cont y
-                return $ Yield z s
-          Skip s -> return $ Skip s
-          Done -> return Done
+    iterl'
+      (Bind (as :: LoopI i m a) (f :: a -> Loop m b) :: LoopI ('B i) m b)
+      (cont :: forall s. r -> Step s b -> m (Step s r))
+      z =
+          iterl' as iterl'_B_go z where
+            iterl'_B_go :: forall s. r -> Step s a -> m (Step s r)
+            iterl'_B_go y st =
+              case st of
+                Yield a s ->
+                  case f a of
+                    Loop l -> do
+                      !x <- iterl l cont y
+                      return (Yield x s)
+                Skip s -> return (Skip s)
+                Done -> return Done
 
     {-# INLINE iterr #-}
-    iterr = \(Bind as f) cont ->
-        iterr as $ \case
-          Yield a s ->
-            case f a of
-              Loop l -> \y -> do
-                z <- iterr l cont y
-                return $ Yield z s
-          Skip s -> \_ -> return $ Skip s
-          Done -> \_ -> return Done
+    iterr
+      (Bind (as :: LoopI i m a) (f :: a -> Loop m b) :: LoopI ('B i) m b)
+      (cont :: forall s. Step s b -> r -> m (Step s r))
+      z =
+          iterr as iterr_B_go z where
+            iterr_B_go :: forall s. Step s a -> r -> m (Step s r)
+            iterr_B_go st y =
+              case st of
+                Yield a s ->
+                  case f a of
+                    Loop l -> do
+                      x <- iterr l cont y
+                      return (Yield x s)
+                Skip s -> return (Skip s)
+                Done -> return Done
 
 instance (Unroll i, Unroll j) => Unroll ('S i j) where
     {-# INLINE iterl #-}
-    iterl = \(Alt i j) cont z -> iterl i cont z >>= iterl j cont
+    iterl (Alt i j) cont z = iterl i cont z >>= iterl j cont
 
     {-# INLINE iterl' #-}
-    iterl' = \(Alt i j) cont z -> iterl' i cont z >>= iterl' j cont
+    iterl' (Alt i j) cont z = iterl' i cont z >>= iterl' j cont
 
     {-# INLINE iterr #-}
-    iterr = \(Alt i j) cont z -> iterr i cont =<< iterr j cont z
+    iterr (Alt i j) cont z = iterr i cont =<< iterr j cont z
 
 instance Unroll 'Z where
     {-# INLINE iterl #-}
-    iterl = \Zero cont y -> do
+    iterl Zero cont y = do
         r <- cont y Done
         case r of
           Yield z _ -> return z
@@ -215,7 +272,7 @@ instance Unroll 'Z where
           Done -> return y
 
     {-# INLINE iterl' #-}
-    iterl' = \Zero cont y -> do
+    iterl' Zero cont y = do
         r <- cont y Done
         case r of
           Yield z _ -> return z
@@ -223,7 +280,7 @@ instance Unroll 'Z where
           Done -> return y
 
     {-# INLINE iterr #-}
-    iterr = \Zero cont y -> do
+    iterr Zero cont y = do
         r <- cont Done y
         case r of
           Yield z _ -> return z
@@ -276,85 +333,98 @@ instance MonadIO m => MonadIO (Loop m) where
     {-# INLINE liftIO #-}
     liftIO = \inner -> lift (liftIO inner)
 
-instance Foldable (Loop Identity) where
+instance (m ~ Identity) => Foldable (Loop m) where
     {-# INLINE foldr #-}
-    foldr = \f z as ->
-        let mf = \a y -> Identity (f a y) in runIdentity (foldrM mf z as)
+    foldr f z as = runIdentity (foldrM foldr_go z as) where
+      foldr_go a y = pure (f a y)
 
     {-# INLINE foldl #-}
-    foldl = \f z bs ->
-        let mf = \y a -> Identity (f y a) in runIdentity (foldlM mf z bs)
+    foldl f z bs = runIdentity (foldlM foldl_go z bs) where
+      foldl_go y a = pure (f y a)
 
     {-# INLINE foldl' #-}
-    foldl' = \f z bs ->
-        let mf = \ !y a -> Identity (f y a) in runIdentity (foldlM' mf z bs)
+    foldl' f z bs = runIdentity (foldlM' foldl'_go z bs) where
+      foldl'_go !y a = pure (f y a)
 
 foldlM :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
 {-# INLINE foldlM #-}
-foldlM = \f x (Loop bs) ->
-  iterl bs (\y -> \case
-    Yield a s -> f y a >>= \z -> return $ Yield z s
-    Skip s -> return $ Skip s
-    Done -> return Done) x
+foldlM f (x :: a) (Loop bs :: Loop m b) = iterl bs foldlM_go x where
+  foldlM_go :: forall s. a -> Step s b -> m (Step s a)
+  foldlM_go y st =
+    case st of
+      Yield a s -> do
+        z <- f y a
+        return (Yield z s)
+      Skip s -> return (Skip s)
+      Done -> return Done
 
 foldlM' :: Monad m => (a -> b -> m a) -> a -> Loop m b -> m a
 {-# INLINE foldlM' #-}
-foldlM' = \f x (Loop bs) ->
-  iterl' bs (\ !y -> \case
-    Yield a s -> f y a >>= \z -> return $ Yield z s
-    Skip s -> return $ Skip s
-    Done -> return Done) x
+foldlM' f (x :: a) (Loop bs :: Loop m b) = iterl' bs foldlM'_go x where
+  foldlM'_go :: forall s. a -> Step s b -> m (Step s a)
+  foldlM'_go !y st =
+    case st of
+      Yield a s -> do
+        !z <- f y a
+        return (Yield z s)
+      Skip s -> return (Skip s)
+      Done -> return Done
 
 foldrM :: Monad m => (a -> b -> m b) -> b -> Loop m a -> m b
 {-# INLINE foldrM #-}
-foldrM = \f x (Loop as) ->
-  iterr as (\case
-    Yield a s -> \y -> f a y >>= \z -> return $ Yield z s
-    Skip s -> \_ -> return $ Skip s
-    Done -> \_ -> return Done) x
+foldrM f (x :: b) (Loop as :: Loop m a) = iterr as foldrM_go x where
+  foldrM_go :: forall s. Step s a -> b -> m (Step s b)
+  foldrM_go st y =
+    case st of
+      Yield a s -> do
+        z <- f a y
+        return (Yield z s)
+      Skip s -> return (Skip s)
+      Done -> return Done
 
 unfoldrM :: Functor f => (s -> f (Maybe (a, s))) -> s -> Loop f a
 {-# INLINE unfoldrM #-}
-unfoldrM = \step s -> Loop (Flat (fmap maybeToStep . step) s)
+unfoldrM step s = Loop (Flat (fmap maybeToStep . step) s)
 
 maybeToStep :: Maybe (a, s) -> Step s a
 {-# INLINE maybeToStep #-}
-maybeToStep = \case
-  Just (a, s) -> Yield a s
-  Nothing -> Done
+maybeToStep mst =
+    case mst of
+      Just (a, s) -> Yield a s
+      Nothing -> Done
 
 enumFromStepN :: (Applicative f, Num a) => a -> a -> Int -> Loop f a
 {-# INLINE enumFromStepN #-}
-enumFromStepN = \ !x !y !n ->
-    let step (w, m)
-          | m > 0 = pure (Yield w (w + y, m - 1))
-          | otherwise = pure Done
-    in Loop (Flat step (x, n))
+enumFromStepN !x !y !n = Loop (Flat step (x, n)) where
+  step (w, m)
+    | m > 0 = pure (Yield w (w + y, m - 1))
+    | otherwise = pure Done
 
 filterM :: Monad m => (a -> m Bool) -> Loop m a -> Loop m a
 {-# INLINE filterM #-}
-filterM = \check (Loop l) ->
-    Loop (Map (\case
+filterM check (Loop l :: Loop m a) = Loop (Map filterM_go l) where
+  filterM_go :: forall s. Step s a -> m (Step s a)
+  filterM_go st =
+    case st of
       Yield a s -> do
         p <- check a
-        return $ if p then Yield a s else Skip s
-      Skip s -> return $ Skip s
-      Done -> return Done) l)
+        return (if p then Yield a s else Skip s)
+      Skip s -> return (Skip s)
+      Done -> return Done
 
 filter :: Monad m => (a -> Bool) -> Loop m a -> Loop m a
 {-# INLINE filter #-}
-filter = \check -> filterM (return . check)
+filter check as = filterM (return . check) as
 
 generateM :: Monad m => Int -> (Int -> m a) -> Loop m a
 {-# INLINE generateM #-}
-generateM = \ !len gen ->
-  let step n
-        | n < len = do
-            a <- gen n
-            return $ Yield a (n + 1)
-        | otherwise = return Done
-  in Loop (Flat step 0)
+generateM !len gen = Loop (Flat step 0) where
+  step n
+    | n < len = do
+        a <- gen n
+        return $ Yield a (n + 1)
+    | otherwise = return Done
 
 generate :: Monad m => Int -> (Int -> a) -> Loop m a
 {-# INLINE generate #-}
-generate = \len gen -> generateM len (return . gen)
+generate len gen = generateM len (return . gen)
